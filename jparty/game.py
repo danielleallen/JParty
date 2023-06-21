@@ -15,6 +15,14 @@ from jparty.utils import SongPlayer, resource_path, CompoundObject
 from jparty.constants import FJTIME, QUESTIONTIME
 
 
+MAX_PLAYERS = 3
+index_to_key = {
+    0: Qt.Key.Key_Q,
+    1: Qt.Key.Key_W,
+    2: Qt.Key.Key_E,
+}
+
+
 class QuestionTimer(object):
     def __init__(self, interval, f, *args, **kwargs):
         super().__init__()
@@ -59,6 +67,7 @@ class KeystrokeEvent:
     hint_setter: callable = None
     active: bool = False
     persistent: bool = False
+    func_args: int = None
 
 
 class KeystrokeManager(object):
@@ -67,10 +76,10 @@ class KeystrokeManager(object):
         self.__events = {}
 
     def addEvent(
-        self, ident, key, func, hint_setter=None, active=False, persistent=False
+        self, ident, key, func, hint_setter=None, active=False, persistent=False, func_args=None
     ):
         self.__events[ident] = KeystrokeEvent(
-            key, func, hint_setter, active, persistent
+            key, func, hint_setter, active, persistent, func_args
         )
 
     def call(self, key):
@@ -84,7 +93,10 @@ class KeystrokeManager(object):
                     self._deactivate(ident)
 
         for event in events_to_call:
-            event.func()
+            if event.func_args is not None:
+                event.func(event.func_args)
+            else:
+                event.func()
 
     def _activate(self, ident):
         logging.info(f"Activating {ident}")
@@ -250,7 +262,16 @@ class Game(QObject):
             self.final_incorrect_answer,
             self.arrowhints,
         )
-
+        for player_index in range(MAX_PLAYERS):
+            self.keystroke_manager.addEvent(
+                f"BUZZED_{player_index}",
+                index_to_key[player_index],
+                self.buzz,
+                lambda x: x, #nonsense
+                active=True,
+                persistent=True,
+                func_args=player_index
+            )
         self.wager_trigger.connect(self.wager)
         self.buzz_trigger.connect(self.buzz)
         self.new_player_trigger.connect(self.new_player)
@@ -285,6 +306,7 @@ class Game(QObject):
 
     def new_player(self):
         self.players = self.buzzer_controller.connected_players
+        print(self.players)
         self.dc.scoreboard.refresh_players()
         self.host_display.welcome_widget.check_start()
 
@@ -310,6 +332,10 @@ class Game(QObject):
         self.timer.pause()
         self.accepting_responses = False
         self.dc.borders.lights(True)
+
+    def keyboard_buzz(self):
+        self.buzz(0)
+
 
     def buzz(self, i_player):
         player = self.players[i_player]
@@ -559,7 +585,7 @@ class Game(QObject):
 
 
 class Player(object):
-    def __init__(self, name, waiter):
+    def __init__(self, name, waiter, player_number):
         self.name = name
         self.token = os.urandom(15)
         self.score = 0
@@ -567,6 +593,11 @@ class Player(object):
         self.wager = None
         self.finalanswer = ""
         self.page = "buzz"
+        self.player_number = player_number
+
+
+
+        self.key = index_to_key[player_number]
 
     def __hash__(self):
         return int.from_bytes(self.token, sys.byteorder)

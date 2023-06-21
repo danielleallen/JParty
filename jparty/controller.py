@@ -118,8 +118,8 @@ class BuzzerSocketHandler(tornado.websocket.WebSocketHandler):
         if len(self.controller.connected_players) >= MAXPLAYERS:
             self.send("FULL")
             return
-
-        self.player = Player(name, self)
+        player_index = len(self.controller.connected_players)
+        self.player = Player(name, self, player_index)
         self.application.controller.new_player(self.player)
         logging.info(
             f"New Player: {self.player} {self.request.remote_ip} {self.player.token.hex()}"
