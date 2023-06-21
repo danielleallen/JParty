@@ -15,11 +15,14 @@ from jparty.utils import SongPlayer, resource_path, CompoundObject
 from jparty.constants import FJTIME, QUESTIONTIME
 
 
-MAX_PLAYERS = 3
+MAX_PLAYERS = 6
 index_to_key = {
     0: Qt.Key.Key_Q,
     1: Qt.Key.Key_W,
     2: Qt.Key.Key_E,
+    3: Qt.Key.Key_R,
+    4: Qt.Key.Key_T,
+    5: Qt.Key.Key_Y,
 }
 
 
