@@ -364,7 +364,9 @@ class Game(QObject):
 
     def back_to_board(self):
         logging.info("back_to_board")
+        print("back to board")
         self.dc.hide_question()
+        print("question hidden")
         self.timer = None
         self.active_question.complete = True
         self.active_question = None
