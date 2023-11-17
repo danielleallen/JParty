@@ -7,9 +7,10 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import QRect
+import os
 
 from jparty.style import MyLabel, CARDPAL
-from jparty.constants import REPO_ROOT
+from jparty.constants import REPO_ROOT, QUESTION_MEDIA
 
 
 class QuestionWidget(QWidget):
@@ -17,10 +18,12 @@ class QuestionWidget(QWidget):
         super().__init__(parent)
         self.question = question
         self.setAutoFillBackground(True)
-        text_only_question = self.isQuestionTypeTextOnly(question)
+        game_id = os.environ["JPARTY_GAME_ID"]
+        question_image = QUESTION_MEDIA / game_id / f"{question.index[0]}-{question.index[1]}.jpg"
+        text_only_question = self.isQuestionTypeTextOnly(question_image)
         self.main_layout = QVBoxLayout()
         self.question_label = MyLabel(
-            question.text.upper(),
+            question.text.upper() if text_only_question else str(question_image),
             self.startFontSize,
             self,
             not text_only_question
@@ -34,9 +37,9 @@ class QuestionWidget(QWidget):
         self.setPalette(CARDPAL)
         self.show()
     
-    def isQuestionTypeTextOnly(self, question):
+    def isQuestionTypeTextOnly(self, question_image):
         """Check if visual clues have been saved for the question"""
-        if question.index == (1, 1):
+        if question_image.exists():
             return False
         else:
             return True
@@ -62,7 +65,7 @@ class HostQuestionWidget(QuestionWidget):
         line_y = self.main_layout.itemAt(1).geometry().top()
         qp.drawLine(0, line_y, self.width(), line_y)
 
-    def isQuestionTypeTextOnly(self, question):
+    def isQuestionTypeTextOnly(self, question_image):
         """Host always see only text"""
         return True
 

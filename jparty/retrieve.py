@@ -7,6 +7,7 @@ from jparty.game import Question, Board, FinalBoard, GameData
 import logging
 import csv
 from jparty.constants import MONIES
+import os
 
 
 def list_to_game(s):
@@ -51,6 +52,7 @@ def get_Gsheet_game(file_id):
 
 
 def get_game(game_id):
+    os.environ["JPARTY_GAME_ID"] = str(game_id)
     if len(str(game_id)) < 7:
         return get_wayback_jarchive_game(game_id)
     else:

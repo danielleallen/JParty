@@ -3,7 +3,7 @@ from PyQt6.QtGui import QPalette, QColor, QPixmap
 from PyQt6.QtCore import QRect, Qt
 
 from jparty.utils import DynamicLabel, add_shadow
-from jparty.constants import REPO_ROOT
+from jparty.constants import REPO_ROOT, QUESTION_MEDIA
 
 
 class JPartyStyle(QCommonStyle):
@@ -33,9 +33,8 @@ class MyLabel(DynamicLabel):
             self.font().setBold(True)
             self.setWordWrap(True)
         else:
-            print("image is ", image)
-            self.question_image = QPixmap(str(REPO_ROOT / "jparty" / "data" / "up-dixie.jpg"))
-            # self.setGeometry(QRect(0, 0, 841, 511))
+            question_image = text
+            self.question_image = QPixmap(str(question_image))
             self.setText("")
             self.setPixmap(self.question_image)
             self.setScaledContents(True)

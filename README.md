@@ -35,6 +35,13 @@ The host sees the answer on the laptop screen and can adjudicate with the arrow 
 - Load custom games via a <a href="https://docs.google.com/spreadsheets/d/1_vBBsWn-EVc7npamLnOKHs34Mc2iAmd9hOGSzxHQX0Y/edit?usp=sharing">simple Google Sheets template</a>
 - Scrape games from https://jeopardylabs.com using this <a href="https://chrome.google.com/webstore/detail/jeopardy-labs-to-csv/biijijhfghhckhlkjbonjedmgnkmenlk?hl=en&authuser=0">Google Chrome extension</a>
 - Final Jeopardy, Daily Doubles, Double Jeopardy
+- Visual Clues
+
+## Visual Clues
+
+JParty supports visual clues, but the user must find the images. To add visual clues for a particular game:
+1. Create a folder in `jparty/data/question_media` with the game of interest's J-Archive url id.
+2. Then for each question that needs visual clues, add an image with the name of the question coordinates separated by a "-" as a ".jpg". The top left question should be saved as "0-0.jpg", and the bottom left should be "5-4.jpg".
 
 ## Requirements:
 ### For running the app (binary)
