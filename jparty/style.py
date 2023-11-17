@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import QStyle, QCommonStyle
-from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPalette, QColor, QPixmap
+from PyQt6.QtCore import QRect, Qt
 
 from jparty.utils import DynamicLabel, add_shadow
+from jparty.constants import REPO_ROOT
 
 
 class JPartyStyle(QCommonStyle):
@@ -26,10 +27,22 @@ class JPartyStyle(QCommonStyle):
 
 
 class MyLabel(DynamicLabel):
-    def __init__(self, text, initialSize, parent=None):
+    def __init__(self, text, initialSize, parent=None, image=False):
         super().__init__(text, initialSize, parent)
-        self.font().setBold(True)
-        self.setWordWrap(True)
+        if not image:
+            self.font().setBold(True)
+            self.setWordWrap(True)
+        else:
+            print("image is ", image)
+            self.question_image = QPixmap(str(REPO_ROOT / "jparty" / "data" / "up-dixie.jpg"))
+            # self.setGeometry(QRect(0, 0, 841, 511))
+            self.setText("")
+            self.setPixmap(self.question_image)
+            self.setScaledContents(True)
+            self.setObjectName("photo")
+
+        
+        
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         add_shadow(self)
