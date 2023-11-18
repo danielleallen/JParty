@@ -1,5 +1,6 @@
 from PyQt6.QtCore import Qt, QObject, pyqtSignal
 from PyQt6.QtWidgets import QInputDialog, QApplication
+import plotly.graph_objects as go
 
 
 import threading
@@ -12,7 +13,7 @@ from collections.abc import Iterable
 import logging
 
 from jparty.utils import SongPlayer, resource_path, CompoundObject
-from jparty.constants import FJTIME, QUESTIONTIME
+from jparty.constants import FJTIME, QUESTIONTIME, REPO_ROOT
 
 
 MAX_PLAYERS = 6
@@ -195,6 +196,7 @@ class Game(QObject):
         self.dc = None
 
         self.data = None
+        self.question_number = 1
 
         self.current_round = None
         self.players = []
@@ -309,7 +311,6 @@ class Game(QObject):
 
     def new_player(self):
         self.players = self.buzzer_controller.connected_players
-        print(self.players)
         self.dc.scoreboard.refresh_players()
         self.host_display.welcome_widget.check_start()
 
@@ -364,9 +365,8 @@ class Game(QObject):
 
     def back_to_board(self):
         logging.info("back_to_board")
-        print("back to board")
+        self.question_number += 1
         self.dc.hide_question()
-        print("question hidden")
         self.timer = None
         self.active_question.complete = True
         self.active_question = None
@@ -451,11 +451,15 @@ class Game(QObject):
 
     def final_correct_answer(self):
         ap = self.answering_player
+        new_score = ap.score + ap.wager
+        ap.update_scores(self.question_number, new_score)
         self.set_score(ap, ap.score + ap.wager)
         self.final_judgement_given()
 
     def final_incorrect_answer(self):
         ap = self.answering_player
+        new_score = ap.score - ap.wager
+        ap.update_scores(self.question_number, new_score)
         self.set_score(ap, ap.score - ap.wager)
         self.final_judgement_given()
 
@@ -485,8 +489,33 @@ class Game(QObject):
         else:
             self.dc.final_window.show_tie()
 
+        self.generate_final_score_graph()
         print("activate close game")
         self.keystroke_manager.activate("CLOSE_GAME")
+
+    def generate_final_score_graph(self):
+        """create an image of score by question number"""
+        data = {player.player_number : player.score_by_question for player in self.players}
+        game_id = os.environ["JPARTY_GAME_ID"]
+        # Create traces for each player
+        traces = []
+        for player, scores in data.items():
+            trace = go.Scatter(x=list(range(1, len(scores)+1)),  # X-axis: Question Number
+                            y=scores,  # Y-axis: Score
+                            mode='lines+markers',
+                            name=player)
+            traces.append(trace)
+        # Create layout
+        layout = go.Layout(title=f'Game {game_id}:Player Scores',
+                        xaxis=dict(title='Question Number'),
+                        yaxis=dict(title='Score'),
+                        showlegend=True)
+
+        fig = go.Figure(data=traces, layout=layout)
+        games_scores_dir = REPO_ROOT / "jparty" / "data" / "game_scores"
+        games_scores_dir.mkdir(exist_ok=True)
+        fig.write_image(str(games_scores_dir / f"{game_id}.jpg"))        
+
 
     def close_game(self):
         self.buzzer_controller.restart()
@@ -538,21 +567,25 @@ class Game(QObject):
         self.keystroke_manager.activate("FINAL_OPEN_RESPONSES")
 
     def correct_answer(self):
+        new_score = self.answering_player.score + self.active_question.value
+        self.answering_player.update_scores(self.question_number, new_score) 
         if self.timer:
             self.timer.cancel()
 
         self.set_score(
             self.answering_player,
-            self.answering_player.score + self.active_question.value,
+            new_score
         )
         self.dc.borders.lights(False)
         self.answer_given()
         self.back_to_board()
 
     def incorrect_answer(self):
+        new_score = self.answering_player.score - self.active_question.value
+        self.answering_player.update_scores(self.question_number, new_score) 
         self.set_score(
             self.answering_player,
-            self.answering_player.score - self.active_question.value,
+            new_score
         )
         self.answer_given()
         if self.active_question.dd:
@@ -583,6 +616,7 @@ class Game(QObject):
         )
         if answered:
             self.set_score(player, new_score)
+        player.scores_by_question[-1] = new_score
 
     def close(self):
         self.song_player.stop()
@@ -593,6 +627,8 @@ class Player(object):
     def __init__(self, name, waiter, player_number):
         self.name = name
         self.token = os.urandom(15)
+        # score at index 0 is start of game, 1 after first question
+        self.score_by_question = [0]
         self.score = 0
         self.waiter = waiter
         self.wager = None
@@ -604,6 +640,15 @@ class Player(object):
 
         self.key = index_to_key[player_number]
 
+    def update_scores(self, question_number, new_score):
+        """update players score"""
+        if (len(self.score_by_question)) == question_number:
+            self.score_by_question.append(new_score)
+        else:
+            for _ in range(question_number - len(self.score_by_question)):
+                self.score_by_question.append(self.score_by_question[-1])
+            self.score_by_question.append(new_score)
+            
     def __hash__(self):
         return int.from_bytes(self.token, sys.byteorder)
 
