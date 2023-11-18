@@ -41,7 +41,7 @@ The host sees the answer on the laptop screen and can adjudicate with the arrow 
 
 JParty supports visual clues, but the user must find the images. To add visual clues for a particular game:
 1. Create a folder in `jparty/data/question_media` with the game of interest's J-Archive url id.
-2. Then for each question that needs visual clues, add an image with the name of the question coordinates separated by a "-" as a ".jpg". The top left question should be saved as "0-0.jpg", and the bottom left should be "5-4.jpg".
+2. Then for each question that needs visual clues, add an image with the board number (Jeopardy is '1', Double Jeopardy is 2) the name of the question coordinates separated by a "-" as a ".jpg". The top left question in the first board should be saved as "1-0-0.jpg", and the bottom left should be "1-5-4.jpg".
 
 ## Requirements:
 ### For running the app (binary)

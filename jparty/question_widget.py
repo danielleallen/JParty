@@ -19,7 +19,8 @@ class QuestionWidget(QWidget):
         self.question = question
         self.setAutoFillBackground(True)
         game_id = os.environ["JPARTY_GAME_ID"]
-        question_image = QUESTION_MEDIA / game_id / f"{question.index[0]}-{question.index[1]}.jpg"
+        question_image_file = f"{2 if self.isDoubleJeopardy(question) else 1}-{question.index[0]}-{question.index[1]}.jpg"
+        question_image = QUESTION_MEDIA / game_id / question_image_file
         text_only_question = self.isQuestionTypeTextOnly(question_image)
         self.main_layout = QVBoxLayout()
         self.question_label = MyLabel(
@@ -36,7 +37,14 @@ class QuestionWidget(QWidget):
 
         self.setPalette(CARDPAL)
         self.show()
-    
+
+    def isDoubleJeopardy(self, question):
+        """returns true if question is in double jeopardy"""
+        if (question.index[1] + 1) * 200 == question.value:
+            return False
+        else:
+            return True
+
     def isQuestionTypeTextOnly(self, question_image):
         """Check if visual clues have been saved for the question"""
         if question_image.exists():
