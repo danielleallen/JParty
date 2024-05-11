@@ -54,7 +54,10 @@ def get_Gsheet_game(file_id):
 def get_game(game_id):
     os.environ["JPARTY_GAME_ID"] = str(game_id)
     if len(str(game_id)) < 7:
-        return get_wayback_jarchive_game(game_id)
+        try:
+            return get_wayback_jarchive_game(game_id)
+        except RuntimeError:
+            return get_JArchive_Game(game_id)
     else:
         return get_Gsheet_game(str(game_id))
 
@@ -62,13 +65,14 @@ def get_game(game_id):
 def findanswer(clue):
     return re.findall(r'correct_response">(.*?)</em', unescape(str(clue)))[0]
 
-def get_JArchive_Game(game_id, wayback_url=None):
-    logging.info(f"getting game {game_id}")
-    if wayback_url is not None:
-        r = requests.get(wayback_url)
-    else:
-        r = requests.get(f"http://www.j-archive.com/showgame.php?game_id={game_id}")
+def get_JArchive_Game(game_id):
+    """First try"""
+    r = requests.get(f"http://www.j-archive.com/showgame.php?game_id={game_id}")
     soup = BeautifulSoup(r.text, "html.parser")
+    return process_game_board_from_soup(soup)
+
+def process_game_board_from_soup(soup) -> GameData:
+    """Given soup from j-archive html, produce a game data object"""
     datesearch = re.search(
         r"- \w+, (.*?)$", soup.select("#game_title > h1")[0].contents[0]
     )
@@ -123,7 +127,16 @@ def get_JArchive_Game(game_id, wayback_url=None):
 
     return GameData(boards, date, comments)
 
-def get_wayback_jarchive_game(game_id):
+def get_wayback_jarchive_game(game_id) -> GameData:
+    """Retrieve and prepare game board from wayback machine"""
+    url = get_url_to_wayback_jarchive_game(game_id)
+    r = requests.get(url)
+    soup = BeautifulSoup(r.text, "html.parser")
+    return process_game_board_from_soup(soup)
+
+
+def get_url_to_wayback_jarchive_game(game_id) -> str:
+    """Retrieve url to j-archive game from the wayback machine"""
     # kudos to Abhi Kumbar: https://medium.com/analytics-vidhya/the-wayback-machine-scraper-63238f6abb66
     # this query's the wayback cdx api for possible instances of the saved jarchive page with the specified game id & returns the latest one
     JArchive_url = f"j-archive.com/showgame.php?game_id={str(game_id)}"  # use the url w/o the http:// or https:// to include both in query
@@ -132,9 +145,7 @@ def get_wayback_jarchive_game(game_id):
     parse_url = json.loads(urls)  # parses the JSON from urls.
     if len(parse_url) == 0:  # if no results, return None
         logging.info("no games found in wayback")
-        # return None
-        # alternative: use fallback to get game from scraping j-archive directly
-        return get_JArchive_Game(game_id)
+        raise RuntimeError("No wayback machine games found")
 
     ## Extracts timestamp and original columns from urls and compiles a url list.
     url_list = []
@@ -145,7 +156,7 @@ def get_wayback_jarchive_game(game_id):
         final_url = f'http://web.archive.org/web/{waylink}'
         url_list.append(final_url)
     latest_url = url_list[-1]
-    return get_JArchive_Game(game_id, latest_url)
+    return latest_url
 
 def get_game_sum(soup):
     date = re.search(
