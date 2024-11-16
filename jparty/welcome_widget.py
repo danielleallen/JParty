@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QLabel,
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSignal
+from PyQt6.QtCore import Qt, QSize, pyqtSignal, QTimer
 
 import qrcode
 import time
@@ -116,8 +116,12 @@ class Welcome(StartWidget):
         )
         self.gameid_label.setOpenExternalLinks(True)
 
+        self.debounce_timer = QTimer(self)
+        self.debounce_timer.setSingleShot(True)
+        self.debounce_timer.timeout.connect(self.debounced_show_summary)
+
         self.textbox = QLineEdit(self)
-        self.textbox.textChanged.connect(self.show_summary)
+        self.textbox.textChanged.connect(self.start_debounce_timer)
         f = self.textbox.font()
         self.textbox.setFont(f)
 
@@ -244,6 +248,14 @@ class Welcome(StartWidget):
 
     def set_gameid(self, text):
         self.textbox.setText(text)
+
+    def start_debounce_timer(self, text):
+        """Start the debounce timer whenever the text changes."""
+        self.debounce_timer.start(2000)  # Adjust debounce delay (in milliseconds) as needed
+
+    def debounced_show_summary(self):
+        """Call show_summary with the current text after debounce period."""
+        self.show_summary(self.textbox.text())
 
     def show_summary(self, text=None):
         self.summary_trigger.emit("Loading...")
