@@ -7,6 +7,7 @@ from jparty.game import Question, Board, FinalBoard, GameData
 import logging
 import csv
 from jparty.constants import MONIES
+import os
 
 
 def list_to_game(s):
@@ -51,6 +52,7 @@ def get_Gsheet_game(file_id):
 
 
 def get_game(game_id):
+    os.environ["JPARTY_GAME_ID"] = str(game_id)
     if len(str(game_id)) < 7:
         try:
             return get_wayback_game(game_id)
@@ -64,6 +66,7 @@ def get_game(game_id):
 def findanswer(clue):
     return re.findall(r'correct_response">(.*?)</em', unescape(str(clue)))[0]
 
+
 def get_jarchive_game(game_id):
     return get_generic_game(game_id, f"http://www.j-archive.com/showgame.php?game_id={game_id}")
 
@@ -71,6 +74,10 @@ def get_generic_game(game_id, url):
     logging.info(f"getting game {game_id} from url {url}")
     r = requests.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
+    return process_game_board_from_soup(soup)
+
+def process_game_board_from_soup(soup) -> GameData:
+    """Given soup from j-archive html, produce a game data object"""
     datesearch = re.search(
         r"- \w+, (.*?)$", soup.select("#game_title > h1")[0].contents[0]
     )
@@ -147,7 +154,6 @@ def get_wayback_game(game_id):
         url_list.append(final_url)
     latest_url = url_list[-1]
     return get_generic_game(game_id, latest_url)
-
 
 def get_game_sum(soup):
     date = re.search(

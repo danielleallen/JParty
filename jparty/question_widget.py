@@ -4,9 +4,13 @@ from PyQt6.QtGui import (
     QColor,
     QFont,
 )
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
+from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import QRect
+import os
 
 from jparty.style import MyLabel, CARDPAL
+from jparty.constants import REPO_ROOT, QUESTION_MEDIA
 
 
 class QuestionWidget(QWidget):
@@ -14,16 +18,39 @@ class QuestionWidget(QWidget):
         super().__init__(parent)
         self.question = question
         self.setAutoFillBackground(True)
-
+        game_id = os.environ["JPARTY_GAME_ID"]
+        question_image_file = f"{2 if self.isDoubleJeopardy(question) else 1}-{question.index[0]}-{question.index[1]}.jpg"
+        question_image = QUESTION_MEDIA / game_id / question_image_file
+        text_only_question = self.isQuestionTypeTextOnly(question_image)
         self.main_layout = QVBoxLayout()
-        self.question_label = MyLabel(question.text.upper(), self.startFontSize, self)
+        self.question_label = MyLabel(
+            question.text.upper() if text_only_question else str(question_image),
+            self.startFontSize,
+            self,
+            not text_only_question
+        )
 
         self.question_label.setFont(QFont("ITC_ Korinna"))
         self.main_layout.addWidget(self.question_label)
+
         self.setLayout(self.main_layout)
 
         self.setPalette(CARDPAL)
         self.show()
+
+    def isDoubleJeopardy(self, question):
+        """returns true if question is in double jeopardy"""
+        if (question.index[1] + 1) * 200 == question.value:
+            return False
+        else:
+            return True
+
+    def isQuestionTypeTextOnly(self, question_image):
+        """Check if visual clues have been saved for the question"""
+        if question_image.exists():
+            return False
+        else:
+            return True
 
     def startFontSize(self):
         return self.width() * 0.05
@@ -32,7 +59,6 @@ class QuestionWidget(QWidget):
 class HostQuestionWidget(QuestionWidget):
     def __init__(self, question, parent=None):
         super().__init__(question, parent)
-
         self.question_label.setText(question.text)
         self.main_layout.setStretchFactor(self.question_label, 6)
         self.main_layout.addSpacing(self.main_layout.contentsMargins().top())
@@ -46,6 +72,10 @@ class HostQuestionWidget(QuestionWidget):
         qp.setPen(QPen(QColor("white")))
         line_y = self.main_layout.itemAt(1).geometry().top()
         qp.drawLine(0, line_y, self.width(), line_y)
+
+    def isQuestionTypeTextOnly(self, question_image):
+        """Host always see only text"""
+        return True
 
 
 class DailyDoubleWidget(QuestionWidget):
