@@ -6,7 +6,7 @@ import json
 from jparty.game import Question, Board, FinalBoard, GameData
 import logging
 import csv
-from jparty.constants import MONIES
+from jparty.constants import MONIES, SAVED_GAMES
 
 
 def list_to_game(s):
@@ -50,13 +50,24 @@ def get_Gsheet_game(file_id):
         return list_to_game(list(r3))
 
 
+def get_game_html(game_id):
+    saved_game_path = SAVED_GAMES / f"{game_id}.html"
+    if saved_game_path.exists():
+        print("game is saved, using saved game")
+        with saved_game_path.open("r") as f:
+            game_html = f.read()
+    try:
+        game_html = get_wayback_game_html(game_id)
+    except Exception as e:
+        print("using j-archive")
+        logging.error(e)
+        game_html = get_jarchive_game_html(game_id)
+    return game_html
+
 def get_game(game_id):
     if len(str(game_id)) < 7:
-        try:
-            return get_wayback_game(game_id)
-        except Exception as e:
-            logging.error(e)
-            return get_jarchive_game(game_id)
+        game_html = get_game_html(game_id)
+        return process_game_board_from_html(game_html)
     else:
         return get_Gsheet_game(str(game_id))
 
@@ -64,13 +75,14 @@ def get_game(game_id):
 def findanswer(clue):
     return re.findall(r'correct_response">(.*?)</em', unescape(str(clue)))[0]
 
-def get_jarchive_game(game_id):
-    return get_generic_game(game_id, f"http://www.j-archive.com/showgame.php?game_id={game_id}")
+def get_jarchive_game_html(game_id):
+    game_url = f"http://www.j-archive.com/showgame.php?game_id={game_id}"
+    r = requests.get(game_url)
+    return r.text
 
-def get_generic_game(game_id, url):
-    logging.info(f"getting game {game_id} from url {url}")
-    r = requests.get(url)
-    soup = BeautifulSoup(r.text, "html.parser")
+def process_game_board_from_html(html) -> GameData:
+    """Given soup from j-archive html, produce a game data object"""
+    soup = BeautifulSoup(html, "html.parser")
     datesearch = re.search(
         r"- \w+, (.*?)$", soup.select("#game_title > h1")[0].contents[0]
     )
@@ -125,7 +137,7 @@ def get_generic_game(game_id, url):
 
     return GameData(boards, date, comments)
 
-def get_wayback_game(game_id):
+def get_wayback_game_html(game_id):
     # kudos to Abhi Kumbar: https://medium.com/analytics-vidhya/the-wayback-machine-scraper-63238f6abb66
     # this query's the wayback cdx api for possible instances of the saved jarchive page with the specified game id & returns the latest one
     JArchive_url = f"j-archive.com/showgame.php?game_id={str(game_id)}"  # use the url w/o the http:// or https:// to include both in query
@@ -146,7 +158,8 @@ def get_wayback_game(game_id):
         final_url = f'http://web.archive.org/web/{waylink}'
         url_list.append(final_url)
     latest_url = url_list[-1]
-    return get_generic_game(game_id, latest_url)
+    r = requests.get(latest_url)
+    return r.text
 
 
 def get_game_sum(soup):
@@ -159,6 +172,7 @@ def get_game_sum(soup):
 
 
 def get_random_game():
+    """Use j-archive's random game feature to get a random game id"""
     r = requests.get("http://j-archive.com/")
     soup = BeautifulSoup(r.text, "html.parser")
 
