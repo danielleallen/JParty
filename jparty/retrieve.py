@@ -56,6 +56,7 @@ def get_game_html(game_id):
         print("game is saved, using saved game")
         with saved_game_path.open("r") as f:
             game_html = f.read()
+            return game_html
     try:
         game_html = get_wayback_game_html(game_id)
     except Exception as e:
@@ -104,7 +105,7 @@ def process_game_board_from_html(html) -> GameData:
             if text_obj is None:
                 logging.info("this game is incomplete")
                 return None
-
+            image_likely = text_obj.find('a')
             text = text_obj.text
             index_key = text_obj["id"]
             index = (
@@ -115,7 +116,7 @@ def process_game_board_from_html(html) -> GameData:
             value = MONIES[i][index[1]]
             answer = findanswer(clue)
             questions.append(
-                Question(index, text, answer, categories[index[0]], value, dd)
+                Question(index, text, answer, categories[index[0]], value, dd, image=image_likely)
             )
         boards.append(Board(categories, questions, dj=(i == 1)))
 

@@ -13,8 +13,9 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QSplitter,
     QSizePolicy,
+    QLineEdit,
 )
-from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtCore import Qt, QUrl, QTimer
 from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest
 import requests
 
@@ -26,9 +27,15 @@ class QuestionWidget(QWidget):
         super().__init__(parent)
         self.question = question
         self.setAutoFillBackground(True)
+        text_only_question = self.isQuestionTypeTextOnly()
 
         self.main_layout = QVBoxLayout()
-        self.question_label = MyLabel(question.text.upper(), self.startFontSize, self)
+        self.question_label = MyLabel(
+            question.text.upper() if text_only_question else self.question.image_url,
+            self.startFontSize,
+            self,
+            not text_only_question
+        )
 
         self.question_label.setFont(QFont("ITC_ Korinna"))
         self.main_layout.addWidget(self.question_label)
@@ -39,53 +46,13 @@ class QuestionWidget(QWidget):
 
     def startFontSize(self):
         return self.width() * 0.05
-
-
-class ImageWidget(QWidget):
-    def __init__(self, image_url, parent=None):
-        super().__init__(parent)
-
-        self.main_layout = QVBoxLayout()
-        self.image_label = QLabel(self)
-
-        # Placeholder while loading the image
-        self.image_label.setText("Loading image...")
-        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # Fetch and load the image
-        self.fetch_image(image_url)
-
-        # Buttons for "Accept" and "Reject"
-        self.buttons_layout = QHBoxLayout()
-        self.accept_button = QPushButton("Accept", self)
-        self.reject_button = QPushButton("Reject", self)
-        self.buttons_layout.addWidget(self.accept_button)
-        self.buttons_layout.addWidget(self.reject_button)
-
-        # Combine the image and buttons
-        self.main_layout.addWidget(self.image_label, 1)
-        self.main_layout.addLayout(self.buttons_layout)
-        self.setLayout(self.main_layout)
-
-    def fetch_image(self, url):
-        """Fetch image from the URL using QNetworkAccessManager."""
-        self.network_manager = QNetworkAccessManager(self)
-        self.network_manager.finished.connect(self.on_image_downloaded)
-        request = QNetworkRequest(QUrl(url))
-        self.network_manager.get(request)
-
-    def on_image_downloaded(self, reply):
-        """Load the downloaded image into the QLabel."""
-        if reply.error() == reply.NetworkError.NoError:
-            pixmap = QPixmap()
-            pixmap.loadFromData(reply.readAll())
-            self.image_label.setPixmap(pixmap.scaled(
-                self.image_label.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+    
+    def isQuestionTypeTextOnly(self):
+        """Check if visual clues have been saved for the question"""
+        if self.question.image and self.question.image_url is not None:
+            return False
         else:
-            self.image_label.setText("Failed to load image.")
+            return True
 
 class HostQuestionWidget(QuestionWidget):
     def __init__(self, question, parent=None):
@@ -105,11 +72,15 @@ class HostQuestionWidget(QuestionWidget):
         line_y = self.main_layout.itemAt(1).geometry().top()
         qp.drawLine(0, line_y, self.width(), line_y)
 
+    def isQuestionTypeTextOnly(self):
+        """Host always see only text"""
+        return True 
+
 
 class HostImageQuestionWidget(QWidget):
     def __init__(self, question, parent=None):
         super().__init__(parent)
-
+        self.question = question
         # Main horizontal layout to divide the screen
         self.main_horizontal_layout = QHBoxLayout(self)
         self.setLayout(self.main_horizontal_layout)
@@ -130,8 +101,10 @@ class HostImageQuestionWidget(QWidget):
 
         self.left_layout.addStretch()  # Add stretch to center content vertically
 
-        # Right section: Image and Buttons
+        # Right section: Image, Text Input, and Buttons
         self.right_layout = QVBoxLayout()
+
+        # Image Label
         self.image_label = QLabel(self)
         self.image_label.setText("Loading image...")
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -142,11 +115,26 @@ class HostImageQuestionWidget(QWidget):
         )
         self.right_layout.addWidget(self.image_label)
 
+        # Textbox for input with debounce functionality
+        self.debounce_timer = QTimer(self)
+        self.debounce_timer.setSingleShot(True)
+        self.debounce_timer.timeout.connect(self.debounced_input_changed)
+
+        self.textbox = QLineEdit(self)
+        self.textbox.setPlaceholderText("Enter image url or search query to wikimedia...")
+        self.textbox.textChanged.connect(self.start_debounce_timer)
+        self.right_layout.addWidget(self.textbox)
+
         # Buttons
         self.buttons_layout = QHBoxLayout()
-        self.accept_button = QPushButton("Accept", self)
-        self.reject_button = QPushButton("Reject", self)
-        self.buttons_layout.addWidget(self.accept_button)
+        self.start_button = QPushButton("Accept Image", self)
+        self.start_button.setEnabled(True)
+        self.start_button.clicked.connect(self.on_start_clicked)
+
+        self.reject_button = QPushButton("No Image Necessary", self)
+        self.reject_button.clicked.connect(self.on_reject_clicked)
+
+        self.buttons_layout.addWidget(self.start_button)
         self.buttons_layout.addWidget(self.reject_button)
         self.right_layout.addLayout(self.buttons_layout)
 
@@ -156,9 +144,9 @@ class HostImageQuestionWidget(QWidget):
         self.main_horizontal_layout.addLayout(self.left_layout, 2)  # Left gets more space
         self.main_horizontal_layout.addLayout(self.right_layout, 1)  # Right gets less space
 
-        # Fetch and display the image asynchronously
-        image_url = search_wikimedia_image(question.answer)
-        self.fetch_image(image_url)
+        # First guess of image is wikimedia result for question answer
+        self.image_url = search_wikimedia_image(question.answer)
+        self.fetch_image(self.image_url)
 
     def fetch_image(self, url):
         """Fetch and display the image from the given URL."""
@@ -179,6 +167,37 @@ class HostImageQuestionWidget(QWidget):
             ))
         else:
             self.image_label.setText("Failed to load image.")
+
+    def start_debounce_timer(self, text):
+        """Start or reset the debounce timer when the text changes."""
+        self.debounce_timer.start(1000)  # 1-second debounce delay
+
+    def debounced_input_changed(self):
+        """Handle debounced text input."""
+        input_text = self.textbox.text()
+        if input_text.startswith("https://"):
+            self.image_url = input_text
+        else:
+            self.image_url = search_wikimedia_image(input_text)
+        self.question.image_url = self.image_url
+        self.fetch_image(self.image_url)
+
+        self.update_start_button(input_text)
+
+    def update_start_button(self, input_text):
+        """Enable or disable the Start button based on input."""
+        if input_text.strip():  # Check if input is not empty
+            self.start_button.setEnabled(True)
+        else:
+            self.start_button.setEnabled(False)
+
+    def on_start_clicked(self):
+        """Handle Start button click."""
+        self.question.image_url = self.image_url
+
+    def on_reject_clicked(self):
+        """Handle Reject button click."""
+        print("Reject button clicked!")
 
 def search_wikimedia_image(query):
     url = "https://en.wikipedia.org/w/api.php"

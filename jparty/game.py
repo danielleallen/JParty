@@ -139,6 +139,8 @@ class Question:
     value: int = -1
     dd: bool = False
     complete: bool = False
+    image: bool = False
+    image_url: str = None
 
 
 class Board(object):
@@ -265,6 +267,18 @@ class Game(QObject):
             self.final_incorrect_answer,
             self.arrowhints,
         )
+        self.keystroke_manager.addEvent(
+            "ACCEPT_IMAGE",
+            Qt.Key.Key_Shift,
+            self.accept_image,
+            self.arrowhints,
+        )
+        self.keystroke_manager.addEvent(
+            "NO_IMAGE_NEEDED",
+            Qt.Key.Key_Control,
+            self.no_image_needed,
+            self.arrowhints,
+        )
         for player_index in range(MAX_PLAYERS):
             self.keystroke_manager.addEvent(
                 f"BUZZED_{player_index}",
@@ -372,6 +386,16 @@ class Game(QObject):
         if all(q.complete for q in self.current_round.questions):
             logging.info("NEXT ROUND")
             self.keystroke_manager.activate("NEXT_ROUND")
+
+    def accept_image(self):
+        logging.info("Proposed question image accepted")
+        self.load_question(self.active_question)
+
+    def no_image_needed(self):
+        logging.info("No image needed for question")
+        self.active_question.image = False
+        self.active_question.image_url = None
+        self.load_question(self.active_question)
 
     def next_round(self):
         logging.info("next round")
@@ -518,6 +542,19 @@ class Game(QObject):
 
         self.keystroke_manager.activate("CORRECT_ANSWER", "INCORRECT_ANSWER")
         self.dc.question_widget.show_question()
+
+    def load_image_review_screen(self, q):
+        self.active_question = q
+        self.keystroke_manager.activate("ACCEPT_IMAGE")
+        self.keystroke_manager.activate("NO_IMAGE_NEEDED")
+
+        self.host_display.load_image_review_screen(q)
+        # custom_image_url = QInputDialog.getText(
+        #     self.host_display,
+        #     "Image URL",
+        #     f"Please input an image url for the clue. Left arrow to accept displayed image and right arrow if no image is needed."
+        # )
+        # print(custom_image_url)
 
     def load_question(self, q):
         self.active_question = q

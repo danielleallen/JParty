@@ -73,7 +73,10 @@ class HostQuestionCard(QuestionCard):
             return None
 
         self.leaveEvent(None)
-        self.game.load_question(self.question)
+        if self.question.image:
+            self.game.load_image_review_screen(self.question)
+        else:
+            self.game.load_question(self.question)
 
     def leaveEvent(self, event):
         if self.inactive():
