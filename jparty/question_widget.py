@@ -201,6 +201,9 @@ class HostImageQuestionWidget(QWidget):
 
 def search_wikimedia_image(query):
     url = "https://en.wikipedia.org/w/api.php"
+    header = {
+        "User-Agent": "J-NoChance/0.1 (trevorspreadbury@gmail.com)"
+    }
     params = {
         "action": "query",
         "format": "json",
@@ -208,7 +211,7 @@ def search_wikimedia_image(query):
         "titles": query,
         "pithumbsize": 500,
     }
-    response = requests.get(url, params=params)
+    response = requests.get(url, params=params, headers=header)
     if response.status_code == 200:
         data = response.json()
         pages = data.get("query", {}).get("pages", {})
