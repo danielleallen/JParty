@@ -56,7 +56,7 @@ class MyLabel(DynamicLabel):
             self.question_image = fetch_image_from_url(str(question_image))
             self.setText("")
             self.setPixmap(self.question_image)
-            self.setScaledContents(True)
+            self.setScaledContents(False)  # Set this to False for proportional scaling
             self.setObjectName("photo")
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -68,6 +68,17 @@ class MyLabel(DynamicLabel):
 
         self.show()
 
+    def resizeEvent(self, event):
+        """Override the resize event to rescale the image."""
+        super().resizeEvent(event)
+        if hasattr(self, 'question_image') and self.question_image:
+            # Scale the pixmap to fit the label's size while keeping the aspect ratio
+            scaled_pixmap = self.question_image.scaled(
+                self.size(), 
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.setPixmap(scaled_pixmap)
 
 WINDOWPAL = QPalette()
 WINDOWPAL.setColor(QPalette.ColorRole.Base, QColor("white"))
