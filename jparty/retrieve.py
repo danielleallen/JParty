@@ -58,6 +58,7 @@ def get_game_html(game_id):
             game_html = f.read()
             return game_html
     try:
+        print("using wayback machine")
         game_html = get_wayback_game_html(game_id)
     except Exception as e:
         print("using j-archive")
@@ -85,7 +86,7 @@ def process_game_board_from_html(html) -> GameData:
     """Given soup from j-archive html, produce a game data object"""
     soup = BeautifulSoup(html, "html.parser")
     datesearch = re.search(
-        r"- \w+, (.*?)$", soup.select("#game_title > h1")[0].contents[0]
+        r"- \w+, (.*?)$", soup.select("#game_title > h1")[0].text
     )
     if datesearch is None:
         return None
@@ -96,6 +97,9 @@ def process_game_board_from_html(html) -> GameData:
     # Normal Rounds
     boards = []
     rounds = soup.find_all(class_="round")
+    # Use only Double and Triple Jeopardy for Celebrity Jeopardy
+    if len(rounds) == 3:
+        rounds = rounds[1:]
     for i, ro in enumerate(rounds):
         categories_objs = ro.find_all(class_="category")
         categories = [c.find(class_="category_name").text for c in categories_objs]
