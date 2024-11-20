@@ -267,18 +267,6 @@ class Game(QObject):
             self.final_incorrect_answer,
             self.arrowhints,
         )
-        self.keystroke_manager.addEvent(
-            "ACCEPT_IMAGE",
-            Qt.Key.Key_Shift,
-            self.accept_image,
-            self.arrowhints,
-        )
-        self.keystroke_manager.addEvent(
-            "NO_IMAGE_NEEDED",
-            Qt.Key.Key_Control,
-            self.no_image_needed,
-            self.arrowhints,
-        )
         for player_index in range(MAX_PLAYERS):
             self.keystroke_manager.addEvent(
                 f"BUZZED_{player_index}",
@@ -545,16 +533,8 @@ class Game(QObject):
 
     def load_image_review_screen(self, q):
         self.active_question = q
-        self.keystroke_manager.activate("ACCEPT_IMAGE")
-        self.keystroke_manager.activate("NO_IMAGE_NEEDED")
-
         self.host_display.load_image_review_screen(q)
-        # custom_image_url = QInputDialog.getText(
-        #     self.host_display,
-        #     "Image URL",
-        #     f"Please input an image url for the clue. Left arrow to accept displayed image and right arrow if no image is needed."
-        # )
-        # print(custom_image_url)
+
 
     def load_question(self, q):
         self.active_question = q

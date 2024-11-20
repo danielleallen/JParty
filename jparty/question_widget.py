@@ -4,6 +4,7 @@ from PyQt6.QtGui import (
     QColor,
     QFont,
     QPixmap,
+    QKeyEvent
 )
 from PyQt6.QtWidgets import (
     QWidget,
@@ -15,7 +16,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QLineEdit,
 )
-from PyQt6.QtCore import Qt, QUrl, QTimer
+from PyQt6.QtCore import Qt, QUrl, QTimer, QObject, QEvent
 from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest
 import requests
 
@@ -78,22 +79,23 @@ class HostQuestionWidget(QuestionWidget):
 
 
 class HostImageQuestionWidget(QWidget):
-    def __init__(self, question, parent=None):
+    def __init__(self, game, parent=None):
         super().__init__(parent)
-        self.question = question
+        self.game = game
+        self.question = game.active_question
         # Main horizontal layout to divide the screen
         self.main_horizontal_layout = QHBoxLayout(self)
         self.setLayout(self.main_horizontal_layout)
 
         # Left section: Question and Answer
         self.left_layout = QVBoxLayout()
-        self.question_label = QLabel(question.text.upper(), self)
+        self.question_label = QLabel(self.question.text.upper(), self)
         self.question_label.setFont(QFont("ITC Korinna", 16))
         self.question_label.setWordWrap(True)
         self.question_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.left_layout.addWidget(self.question_label)
 
-        self.answer_label = QLabel(question.answer, self)
+        self.answer_label = QLabel(self.question.answer, self)
         self.answer_label.setFont(QFont("ITC Korinna", 14))
         self.answer_label.setWordWrap(True)
         self.answer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -145,7 +147,7 @@ class HostImageQuestionWidget(QWidget):
         self.main_horizontal_layout.addLayout(self.right_layout, 1)  # Right gets less space
 
         # First guess of image is wikimedia result for question answer
-        self.image_url = search_wikimedia_image(question.answer)
+        self.image_url = search_wikimedia_image(self.question.answer)
         self.fetch_image(self.image_url)
 
     def fetch_image(self, url):
@@ -193,11 +195,11 @@ class HostImageQuestionWidget(QWidget):
 
     def on_start_clicked(self):
         """Handle Start button click."""
-        self.question.image_url = self.image_url
+        self.game.accept_image()
 
     def on_reject_clicked(self):
         """Handle Reject button click."""
-        print("Reject button clicked!")
+        self.game.no_image_needed()
 
 def search_wikimedia_image(query):
     url = "https://en.wikipedia.org/w/api.php"

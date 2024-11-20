@@ -183,8 +183,8 @@ class HostDisplayWindow(DisplayWindow):
         else:
             return HostQuestionWidget(q, self)
         
-    def create_image_question_widget(self, q):
-        return HostImageQuestionWidget(q, self)
+    def create_image_question_widget(self, game):
+        return HostImageQuestionWidget(game, self)
 
     def create_final_widget(self, q):
         return HostFinalJeopardyWidget(q, self)
@@ -198,7 +198,7 @@ class HostDisplayWindow(DisplayWindow):
 
     def load_image_review_screen(self, q):
         self.on_image_question = True
-        self.image_question_widget = self.create_image_question_widget(q)
+        self.image_question_widget = self.create_image_question_widget(self.game)
         self.board_widget.setVisible(False)
         self.board_layout.replaceWidget(self.board_widget, self.image_question_widget)
 
