@@ -131,10 +131,10 @@ class HostImageQuestionWidget(QWidget):
         self.buttons_layout = QHBoxLayout()
         self.start_button = QPushButton("Accept Image", self)
         self.start_button.setEnabled(True)
-        self.start_button.clicked.connect(self.on_start_clicked)
+        self.start_button.clicked.connect(self.on_accept_image_clicked)
 
         self.reject_button = QPushButton("No Image Necessary", self)
-        self.reject_button.clicked.connect(self.on_reject_clicked)
+        self.reject_button.clicked.connect(self.on_no_image_needed_clicked)
 
         self.buttons_layout.addWidget(self.start_button)
         self.buttons_layout.addWidget(self.reject_button)
@@ -184,20 +184,22 @@ class HostImageQuestionWidget(QWidget):
         self.question.image_url = self.image_url
         self.fetch_image(self.image_url)
 
-        self.update_start_button(input_text)
+        self.update_accept_button(input_text)
 
-    def update_start_button(self, input_text):
+    def update_accept_button(self, input_text):
         """Enable or disable the Start button based on input."""
         if input_text.strip():  # Check if input is not empty
             self.start_button.setEnabled(True)
         else:
             self.start_button.setEnabled(False)
 
-    def on_start_clicked(self):
+    def on_accept_image_clicked(self):
         """Handle Start button click."""
+        self.question.image = True
+        self.question.image_url = self.image_url
         self.game.accept_image()
 
-    def on_reject_clicked(self):
+    def on_no_image_needed_clicked(self):
         """Handle Reject button click."""
         self.game.no_image_needed()
 
