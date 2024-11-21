@@ -513,12 +513,15 @@ class Game(QObject):
         self.answering_player = player
         self.soliciting_player = False
 
-        max_wager = max(self.answering_player.score, 1000)
+        round_index = self.data.rounds.index(self.current_round)
+        max_wager = max(
+            self.answering_player.score,
+            1000 if round_index == 0 else 2000)
         wager_res = QInputDialog.getInt(
             self.host_display,
             "Wager",
-            f"How much do they wager? (max: ${max_wager})",
-            min=0,
+            f"How much do they wager? (min: 5, max: ${max_wager})",
+            min=5,
             max=max_wager,
         )
         if not wager_res[1]:
