@@ -21,6 +21,7 @@ from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest
 import requests
 from pathlib import Path
 from jparty.style import MyLabel, CARDPAL
+from jparty.utils import search_wikimedia_image
 
 
 class QuestionWidget(QWidget):
@@ -261,31 +262,6 @@ class HostImageQuestionWidget(QWidget):
     def on_no_image_needed_clicked(self):
         """Handle reject image button click."""
         self.game.no_image_needed()
-
-
-def search_wikimedia_image(query):
-    url = "https://en.wikipedia.org/w/api.php"
-    header = {
-        "User-Agent": "J-NoChance/0.1 (trevorspreadbury@gmail.com)"
-    }
-    params = {
-        "action": "query",
-        "format": "json",
-        "prop": "pageimages",
-        "titles": query,
-        "pithumbsize": 500,
-    }
-    response = requests.get(url, params=params, headers=header)
-    if response.status_code == 200:
-        data = response.json()
-        pages = data.get("query", {}).get("pages", {})
-        for page_id, page_data in pages.items():
-            if "thumbnail" in page_data:
-                return page_data["thumbnail"]["source"]
-        return "No image found."
-    else:
-        return f"Error: {response.status_code}"
-
 
 class DailyDoubleWidget(QuestionWidget):
     def __init__(self, question, parent=None):
