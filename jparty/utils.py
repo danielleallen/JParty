@@ -4,6 +4,7 @@ from threading import Thread
 import re
 import os
 import sys
+import requests
 
 
 from PyQt6.QtGui import QColor, QFontMetrics
