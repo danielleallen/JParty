@@ -139,6 +139,8 @@ class Question:
     value: int = -1
     dd: bool = False
     complete: bool = False
+    image: bool = False
+    image_url: str = None
 
 
 class Board(object):
@@ -373,6 +375,16 @@ class Game(QObject):
             logging.info("NEXT ROUND")
             self.keystroke_manager.activate("NEXT_ROUND")
 
+    def accept_image(self):
+        logging.info("Proposed question image accepted")
+        self.load_question(self.active_question)
+
+    def no_image_needed(self):
+        logging.info("No image needed for question")
+        self.active_question.image = False
+        self.active_question.image_url = None
+        self.load_question(self.active_question)
+
     def next_round(self):
         logging.info("next round")
         i = self.data.rounds.index(self.current_round)
@@ -518,6 +530,11 @@ class Game(QObject):
 
         self.keystroke_manager.activate("CORRECT_ANSWER", "INCORRECT_ANSWER")
         self.dc.question_widget.show_question()
+
+    def load_image_review_screen(self, q):
+        self.active_question = q
+        self.host_display.load_image_review_screen(q)
+
 
     def load_question(self, q):
         self.active_question = q

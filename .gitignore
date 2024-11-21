@@ -3,3 +3,4 @@ jparty/__pycache__/**
 latest.log
 dist**
 .idea/**
+jparty/data/**

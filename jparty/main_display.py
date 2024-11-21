@@ -18,6 +18,7 @@ from jparty.question_widget import (
     HostQuestionWidget,
     HostDailyDoubleWidget,
     HostFinalJeopardyWidget,
+    HostImageQuestionWidget,
 )
 from jparty.final_display import FinalDisplay
 from jparty.welcome_widget import Welcome, QRWidget
@@ -159,6 +160,7 @@ class DisplayWindow(QMainWindow):
 class HostDisplayWindow(DisplayWindow):
     def __init__(self, game):
         super().__init__(game)
+        self.on_image_question = False
 
     def host(self):
         return True
@@ -180,6 +182,9 @@ class HostDisplayWindow(DisplayWindow):
             return HostDailyDoubleWidget(q, self)
         else:
             return HostQuestionWidget(q, self)
+        
+    def create_image_question_widget(self, game):
+        return HostImageQuestionWidget(game, self)
 
     def create_final_widget(self, q):
         return HostFinalJeopardyWidget(q, self)
@@ -190,3 +195,20 @@ class HostDisplayWindow(DisplayWindow):
     def hide_welcome_widgets(self):
         super().hide_welcome_widgets()
         self.scoreboard.hide_close_buttons()
+
+    def load_image_review_screen(self, q):
+        self.on_image_question = True
+        self.image_question_widget = self.create_image_question_widget(self.game)
+        self.board_widget.setVisible(False)
+        self.board_layout.replaceWidget(self.board_widget, self.image_question_widget)
+
+    def load_question(self, q):
+        self.question_widget = self.create_question_widget(q)
+        self.board_widget.setVisible(False)
+        if self.on_image_question:
+            self.on_image_question = False
+            self.board_layout.replaceWidget(self.image_question_widget, self.question_widget)
+            self.image_question_widget.deleteLater()
+            self.image_question_widget = None
+        else:
+            self.board_layout.replaceWidget(self.board_widget, self.question_widget)

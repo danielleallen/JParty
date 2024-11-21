@@ -35,6 +35,17 @@ The host sees the answer on the laptop screen and can adjudicate with the arrow 
 - Load custom games via a <a href="https://docs.google.com/spreadsheets/d/1JqfJ_OgTstaXTyH5nV3_eN6YXqvZ1RviPmN7OwLhG0U/edit?usp=sharing">simple Google Sheets template</a>
 - Scrape games from https://jeopardylabs.com using this <a href="https://chrome.google.com/webstore/detail/jeopardy-labs-to-csv/biijijhfghhckhlkjbonjedmgnkmenlk?hl=en&authuser=0">Google Chrome extension</a>
 - Final Jeopardy, Daily Doubles, Double Jeopardy
+- Visual Clues
+
+## Visual Clues
+
+JParty supports visual clues! By default, any question with a hyperlink on the J-Archive page will prompt the host to either find an image for the question or determine that no image is needed before displaying the question to contestants. The host uses a search box to either enter a url to an image or a query to Wikimedia to find an appropriate image. 
+
+Users also have the option to find images beforehand by going through the following process:
+1. Create a folder in `jparty/data/question_media` with the game of interest's J-Archive url id.
+2. Then for each question that needs visual clues, add an image with the board number (Jeopardy is '0', Double Jeopardy is '1') the name of the question coordinates separated by a "-". For example the first clue of the game is "0-0-0". Any common image file extension should work (tested on jpeg, jpg, webp, png). For reference the layout of the single jeopardy round is as follows:
+<img src="resources/question-media-labelling.png" height="300" />
+
 
 ## Requirements:
 ### For running the app (binary)

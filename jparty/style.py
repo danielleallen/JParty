@@ -1,6 +1,9 @@
 from PyQt6.QtWidgets import QStyle, QCommonStyle
-from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPalette, QColor, QPixmap
+from PyQt6.QtCore import Qt, QRect, QByteArray
+
+import requests
+from pathlib import Path
 
 from jparty.utils import DynamicLabel, add_shadow
 
@@ -24,12 +27,41 @@ class JPartyStyle(QCommonStyle):
     def styleHint(self, key, *args, **kwargs):
         return JPartyStyle.SH_dict.get(key, super().styleHint(key, *args, **kwargs))
 
+def fetch_image_from_url(url: str) -> QPixmap:
+    """
+    Fetches an image from the given URL and converts it to a QPixmap.
+    """
+    try:
+        # Fetch image data from the URL
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an error for failed requests
+        
+        # Convert image data to QPixmap
+        image_data = QByteArray(response.content)
+        pixmap = QPixmap()
+        pixmap.loadFromData(image_data)
+        
+        return pixmap
+    except Exception as e:
+        print(f"Failed to fetch or load the image: {e}")
+        return QPixmap()  # Return an empty pixmap on failure
 
 class MyLabel(DynamicLabel):
-    def __init__(self, text, initialSize, parent=None):
+    def __init__(self, text, initialSize, parent=None, image=False):
         super().__init__(text, initialSize, parent)
-        self.font().setBold(True)
-        self.setWordWrap(True)
+        if not image:
+            self.font().setBold(True)
+            self.setWordWrap(True)
+        else:
+            self.question_image = text
+            if not Path(self.question_image).exists():
+                self.question_image_pixmap = fetch_image_from_url(str(self.question_image))
+            else:
+                self.question_image_pixmap = QPixmap(self.question_image)
+            self.setText("")
+            self.setPixmap(self.question_image_pixmap)
+            self.setScaledContents(False)  # Set this to False for proportional scaling
+            self.setObjectName("photo")
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         add_shadow(self)
@@ -40,6 +72,17 @@ class MyLabel(DynamicLabel):
 
         self.show()
 
+    def resizeEvent(self, event):
+        """Override the resize event to rescale the image."""
+        super().resizeEvent(event)
+        if hasattr(self, 'question_image_pixmap') and self.question_image_pixmap:
+            # Scale the pixmap to fit the label's size while keeping the aspect ratio
+            scaled_pixmap = self.question_image_pixmap.scaled(
+                self.size(), 
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.setPixmap(scaled_pixmap)
 
 WINDOWPAL = QPalette()
 WINDOWPAL.setColor(QPalette.ColorRole.Base, QColor("white"))
