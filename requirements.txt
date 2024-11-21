@@ -1,4 +1,4 @@
-PyQt6==6.4.0
+PyQt6~=6.7.0
 requests==2.32.0
 simpleaudio==1.0.4
 tornado==6.3.3
