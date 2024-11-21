@@ -3,6 +3,7 @@ from PyQt6.QtGui import QPalette, QColor, QPixmap
 from PyQt6.QtCore import Qt, QRect, QByteArray
 
 import requests
+from pathlib import Path
 
 from jparty.utils import DynamicLabel, add_shadow
 
@@ -52,10 +53,13 @@ class MyLabel(DynamicLabel):
             self.font().setBold(True)
             self.setWordWrap(True)
         else:
-            question_image = text
-            self.question_image = fetch_image_from_url(str(question_image))
+            self.question_image = text
+            if not Path(self.question_image).exists():
+                self.question_image_pixmap = fetch_image_from_url(str(self.question_image))
+            else:
+                self.question_image_pixmap = QPixmap(self.question_image)
             self.setText("")
-            self.setPixmap(self.question_image)
+            self.setPixmap(self.question_image_pixmap)
             self.setScaledContents(False)  # Set this to False for proportional scaling
             self.setObjectName("photo")
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -71,9 +75,9 @@ class MyLabel(DynamicLabel):
     def resizeEvent(self, event):
         """Override the resize event to rescale the image."""
         super().resizeEvent(event)
-        if hasattr(self, 'question_image') and self.question_image:
+        if hasattr(self, 'question_image_pixmap') and self.question_image_pixmap:
             # Scale the pixmap to fit the label's size while keeping the aspect ratio
-            scaled_pixmap = self.question_image.scaled(
+            scaled_pixmap = self.question_image_pixmap.scaled(
                 self.size(), 
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
