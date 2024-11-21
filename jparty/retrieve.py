@@ -6,7 +6,7 @@ import json
 from jparty.game import Question, Board, FinalBoard, GameData
 import logging
 import csv
-from jparty.constants import MONIES, SAVED_GAMES
+from jparty.constants import MONIES, SAVED_GAMES, QUESTION_MEDIA
 
 
 def list_to_game(s):
@@ -69,7 +69,7 @@ def get_game_html(game_id):
 def get_game(game_id):
     if len(str(game_id)) < 7:
         game_html = get_game_html(game_id)
-        return process_game_board_from_html(game_html)
+        return process_game_board_from_html(game_html, game_id)
     else:
         return get_Gsheet_game(str(game_id))
 
@@ -82,8 +82,24 @@ def get_jarchive_game_html(game_id):
     r = requests.get(game_url)
     return r.text
 
-def process_game_board_from_html(html) -> GameData:
-    """Given soup from j-archive html, produce a game data object"""
+def find_question_media(game_id: int, round: int, index: tuple) -> str:
+    """Return path to question media or False if none exist
+    
+    Args:
+        game_id: game id
+        round: round number, 1-jeopardy, 2-double jeopardy
+        index: (category, question) index, from top left 0-indexed
+    """
+    game_media_path = QUESTION_MEDIA / str(game_id)
+    if game_media_path.exists():
+        potential_filename = f"{round}-{index[0]}-{index[1]}"
+        for media_file in game_media_path.iterdir():
+            if media_file.stem == potential_filename:
+                return str(media_file)
+    return False
+
+def process_game_board_from_html(html, game_id) -> GameData:
+    """Given j-archive html, produce a game data object"""
     soup = BeautifulSoup(html, "html.parser")
     datesearch = re.search(
         r"- \w+, (.*?)$", soup.select("#game_title > h1")[0].text
@@ -110,6 +126,7 @@ def process_game_board_from_html(html) -> GameData:
                 logging.info("this game is incomplete")
                 return None
             image_likely = text_obj.find('a')
+            image_url = None
             text = text_obj.text
             index_key = text_obj["id"]
             index = (
@@ -119,8 +136,12 @@ def process_game_board_from_html(html) -> GameData:
             dd = clue.find(class_="clue_value_daily_double") is not None
             value = MONIES[i][index[1]]
             answer = findanswer(clue)
+            potential_media_file = find_question_media(game_id, i, index)
+            if potential_media_file:
+                image_likely = True
+                image_url = potential_media_file
             questions.append(
-                Question(index, text, answer, categories[index[0]], value, dd, image=image_likely)
+                Question(index, text, answer, categories[index[0]], value, dd, image=image_likely, image_url=image_url)
             )
         boards.append(Board(categories, questions, dj=(i == 1)))
 
