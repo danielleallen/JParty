@@ -6,6 +6,7 @@ import json
 from jparty.game import Question, Board, FinalBoard, GameData
 import logging
 import csv
+import os
 from jparty.constants import MONIES, SAVED_GAMES, QUESTION_MEDIA
 
 
@@ -67,6 +68,7 @@ def get_game_html(game_id):
     return game_html
 
 def get_game(game_id):
+    os.environ["JPARTY_GAME_ID"] = str(game_id)
     if len(str(game_id)) < 7:
         game_html = get_game_html(game_id)
         return process_game_board_from_html(game_html, game_id)
