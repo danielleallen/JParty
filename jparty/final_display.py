@@ -1,8 +1,27 @@
+import os
+
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
 
 from jparty.scoreboard import NameLabel
 from jparty.style import MyLabel, CARDPAL
 from jparty.utils import add_shadow
+from jparty.constants import REPO_ROOT
+
+
+class GraphDisplay(QWidget):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.main_layout = QVBoxLayout()
+        self.question_label = MyLabel(
+            str(REPO_ROOT / "jparty" / "data" / "game_scores" / f"{os.environ['JPARTY_GAME_ID']}-all.jpg"),
+            10,
+            self,
+            True,
+        )
+        self.main_layout.addWidget(self.question_label)
+        self.setLayout(self.main_layout)
+        self.setPalette(CARDPAL)
+        self.show() 
 
 
 class FinalDisplay(QWidget):

@@ -142,6 +142,7 @@ class Question:
     complete: bool = False
     image: bool = False
     image_url: str = None
+    actual_results: str = None
 
 
 class Board(object):
@@ -201,6 +202,7 @@ class Game(QObject):
 
         self.current_round = None
         self.players = []
+        self.original_players = {}
 
         self.active_question = None
         self.accepting_responses = False
@@ -237,6 +239,9 @@ class Game(QObject):
         )
         self.keystroke_manager.addEvent(
             "CLOSE_GAME", Qt.Key.Key_Space, self.close_game, self.spacehints
+        )
+        self.keystroke_manager.addEvent(
+            "GENERATE_GRAPHS", Qt.Key.Key_Space, self.generate_final_score_graphs, self.spacehints
         )
         self.keystroke_manager.addEvent(
             "FINAL_OPEN_RESPONSES",
@@ -312,7 +317,6 @@ class Game(QObject):
 
     def new_player(self):
         self.players = self.buzzer_controller.connected_players
-        print(self.players)
         self.dc.scoreboard.refresh_players()
         self.host_display.welcome_widget.check_start()
 
@@ -365,12 +369,24 @@ class Game(QObject):
         self.dc.player_widget(self.answering_player).stop_lights()
         self.answering_player = None
 
+    def update_original_player_scores(self):
+        buzzed_players = []
+        for player, score in self.active_question.actual_results:
+            if player not in self.original_players:
+                self.original_players[player] = [0 for _ in range(self.question_number)]
+            buzzed_players.append(player)
+            self.original_players[player].append(score + self.original_players[player][-1])
+        for player in self.original_players:
+            if player not in buzzed_players:
+                self.original_players[player].append(self.original_players[player][-1])
+
     def back_to_board(self):
         logging.info("back_to_board")
         self.question_number += 1
         self.dc.hide_question()
         self.timer = None
         self.active_question.complete = True
+        self.update_original_player_scores()
         self.active_question = None
         self.previous_answerer = None
         if all(q.complete for q in self.current_round.questions):
@@ -472,6 +488,8 @@ class Game(QObject):
         ap = self.answering_player
         new_score = ap.score - ap.wager
         ap.update_scores(self.question_number, new_score)
+        self.set_score(ap, new_score)
+        self.final_judgement_given()
 
     def final_judgement_given(self):
         self.keystroke_manager.deactivate(
@@ -499,13 +517,25 @@ class Game(QObject):
         else:
             self.dc.final_window.show_tie()
 
-        self.generate_final_score_graph()
-        print("activate close game")
+        # self.generate_final_score_graph()
+        logging.info("Game over!")
+        self.keystroke_manager.activate("GENERATE_GRAPHS")
+
+    def generate_final_score_graphs(self):
+        for player_set in ["original", "current", "all"]:
+            self.generate_final_score_graph(player_set)
+        self.dc.load_final_graphs()
         self.keystroke_manager.activate("CLOSE_GAME")
 
-    def generate_final_score_graph(self):
+    def generate_final_score_graph(self, players):
         """create an image of score by question number"""
-        data = {player.player_number : player.score_by_question for player in self.players}
+        current_player_data = {player.player_number : player.score_by_question for player in self.players}
+        if players == "original":
+            data = self.original_players
+        elif players == "current":
+            data = current_player_data
+        elif players == "all":
+            data = current_player_data | self.original_players
         game_id = os.environ["JPARTY_GAME_ID"]
         # Create traces for each player
         traces = []
@@ -524,7 +554,7 @@ class Game(QObject):
         fig = go.Figure(data=traces, layout=layout)
         games_scores_dir = REPO_ROOT / "jparty" / "data" / "game_scores"
         games_scores_dir.mkdir(exist_ok=True)
-        fig.write_image(str(games_scores_dir / f"{game_id}.jpg"))        
+        fig.write_image(str(games_scores_dir / f"{game_id}-{players}.jpg"))      
 
     def close_game(self):
         self.buzzer_controller.restart()

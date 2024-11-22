@@ -20,7 +20,7 @@ from jparty.question_widget import (
     HostFinalJeopardyWidget,
     HostImageQuestionWidget,
 )
-from jparty.final_display import FinalDisplay
+from jparty.final_display import FinalDisplay, GraphDisplay
 from jparty.welcome_widget import Welcome, QRWidget
 
 
@@ -133,6 +133,12 @@ class DisplayWindow(QMainWindow):
     def load_final_judgement(self):
         self.final_display = FinalDisplay(self.game, self)
         self.final_window = self.final_display.answer_widget
+
+    def load_final_graphs(self):
+        self.graph_display = GraphDisplay(self)
+        self.question_widget.setVisible(False)
+        self.final_display.setVisible(False)
+        self.board_layout.replaceWidget(self.question_widget, self.graph_display)
 
     def closeEvent(self, event):
         super().closeEvent(event)

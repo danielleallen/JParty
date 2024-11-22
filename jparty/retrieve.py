@@ -100,6 +100,22 @@ def find_question_media(game_id: int, round: int, index: tuple) -> str:
                 return str(media_file)
     return False
 
+def get_actual_player_results(clue: BeautifulSoup, value: int):
+    """Get the results from the actual jeopardy contestants"""
+    dd_value = clue.find(class_="clue_value_daily_double")
+    if dd_value is not None:
+        value = int(dd_value.text[5:].replace(",", ""))
+    wrong_answers = clue.find_all("td", {"class": "wrong"})
+    answers = [
+        [wrong_answer.text, -value] 
+        for wrong_answer in wrong_answers 
+        if wrong_answer.text != "Triple Stumper"
+    ]
+    right_answer = clue.find("td", {"class": "right"})
+    if right_answer:
+        answers.append([right_answer.text, value])
+    return answers
+
 def process_game_board_from_html(html, game_id) -> GameData:
     """Given j-archive html, produce a game data object"""
     soup = BeautifulSoup(html, "html.parser")
@@ -130,6 +146,7 @@ def process_game_board_from_html(html, game_id) -> GameData:
             image_likely = text_obj.find('a')
             image_url = None
             text = text_obj.text
+            # get actual player results
             index_key = text_obj["id"]
             index = (
                 int(index_key[-3]) - 1,
@@ -137,13 +154,24 @@ def process_game_board_from_html(html, game_id) -> GameData:
             )  # get index from id string
             dd = clue.find(class_="clue_value_daily_double") is not None
             value = MONIES[i][index[1]]
+            actual_results = get_actual_player_results(clue, value)
             answer = findanswer(clue)
             potential_media_file = find_question_media(game_id, i, index)
             if potential_media_file:
                 image_likely = True
                 image_url = potential_media_file
             questions.append(
-                Question(index, text, answer, categories[index[0]], value, dd, image=image_likely, image_url=image_url)
+                Question(
+                    index,
+                    text,
+                    answer,
+                    categories[index[0]],
+                    value,
+                    dd,
+                    image=image_likely,
+                    image_url=image_url,
+                    actual_results=actual_results
+                )
             )
         boards.append(Board(categories, questions, dj=(i == 1)))
 
