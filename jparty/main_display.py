@@ -57,6 +57,7 @@ class DisplayWindow(QMainWindow):
 
         self.final_window = None
         self.final_display = None
+        self.graph_display = None
 
         self.setCentralWidget(self.newWidget)
 
@@ -157,7 +158,9 @@ class DisplayWindow(QMainWindow):
     def restart(self):
         self.hide_question()
         self.final_display.close()
+        self.graph_display.close()
         self.final_display = None
+        self.graph_display = None
         self.board_widget.clear()
         self.show_welcome_widgets()
         self.scoreboard.refresh_players()

@@ -26,6 +26,8 @@ index_to_key = {
     5: Qt.Key.Key_Y,
 }
 
+def save_image(figure, image_path):
+    figure.write_image(image_path)
 
 class QuestionTimer(object):
     def __init__(self, interval, f, *args, **kwargs):
@@ -522,6 +524,7 @@ class Game(QObject):
         self.keystroke_manager.activate("GENERATE_GRAPHS")
 
     def generate_final_score_graphs(self):
+        self.keystroke_manager.deactivate("GENERATE_GRAPHS")
         for player_set in ["original", "current", "all"]:
             self.generate_final_score_graph(player_set)
         self.dc.load_final_graphs()
@@ -554,7 +557,14 @@ class Game(QObject):
         fig = go.Figure(data=traces, layout=layout)
         games_scores_dir = REPO_ROOT / "jparty" / "data" / "game_scores"
         games_scores_dir.mkdir(exist_ok=True)
-        fig.write_image(str(games_scores_dir / f"{game_id}-{players}.jpg"))      
+
+        # Run rendering in a separate thread
+        render_thread = threading.Thread(
+            target=save_image,
+            args=(fig, str(games_scores_dir / f"{game_id}-{players}.jpg")),
+        )
+        render_thread.start()
+        render_thread.join()
 
     def close_game(self):
         self.buzzer_controller.restart()
