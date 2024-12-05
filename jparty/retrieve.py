@@ -116,6 +116,18 @@ def get_actual_player_results(clue: BeautifulSoup, value: int):
         answers.append([right_answer.text, value])
     return answers
 
+def get_actual_player_final(clue: BeautifulSoup) -> list[list[str]]:
+    answers = []
+    wrong_players = clue.find_all("td", {"class": "wrong"})
+    for player_answer in wrong_players:
+        value = int(player_answer.parent.find_next_sibling("tr").text.strip()[1:].replace(",", ""))
+        answers.append([player_answer.text, -value])
+    right_players = clue.find_all("td", {"class": "right"})
+    for player_answer in right_players:
+        value = int(player_answer.parent.find_next_sibling("tr").text.strip()[1:].replace(",", ""))
+        answers.append([player_answer.text, value])
+    return answers
+
 def process_game_board_from_html(html, game_id) -> GameData:
     """Given j-archive html, produce a game data object"""
     soup = BeautifulSoup(html, "html.parser")
@@ -138,9 +150,11 @@ def process_game_board_from_html(html, game_id) -> GameData:
         categories_objs = ro.find_all(class_="category")
         categories = [c.find(class_="category_name").text for c in categories_objs]
         questions = []
+        dds = 0
         for clue in ro.find_all(class_="clue"):
             text_obj = clue.find(class_="clue_text")
             if text_obj is None:
+                print(f"{game_id} is inccomplete")
                 logging.info("this game is incomplete")
                 return None
             image_likely = text_obj.find('a')
@@ -153,6 +167,10 @@ def process_game_board_from_html(html, game_id) -> GameData:
                 int(index_key[-1]) - 1,
             )  # get index from id string
             dd = clue.find(class_="clue_value_daily_double") is not None
+            if dd:
+                dds += 1
+            if dds > i + 1:
+                dd = False 
             value = MONIES[i][index[1]]
             actual_results = get_actual_player_results(clue, value)
             answer = findanswer(clue)
@@ -180,14 +198,16 @@ def process_game_board_from_html(html, game_id) -> GameData:
     category_obj = final_round_obj.find_all(class_="category")[0]
     category = category_obj.find(class_="category_name").text
     clue = final_round_obj.find_all(class_="clue")[0]
+    actual_results = get_actual_player_final(clue)
     text_obj = clue.find(class_="clue_text")
     if text_obj is None:
         logging.info("this game is incomplete")
         return None
 
+
     text = text_obj.text
     answer = findanswer(final_round_obj)
-    question = Question((0, 0), text, answer, category)
+    question = Question((0, 0), text, answer, category, actual_results=actual_results)
 
     boards.append(FinalBoard(category, question))
 

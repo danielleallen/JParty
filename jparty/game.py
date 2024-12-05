@@ -413,6 +413,8 @@ class Game(QObject):
 
         if isinstance(self.current_round, FinalBoard):
             self.dc.load_final(self.current_round.question)
+            self.active_question = self.current_round.question
+            self.update_original_player_scores()
             self.start_final()
         else:
             self.dc.board_widget.load_round(self.current_round)
@@ -673,7 +675,7 @@ class Game(QObject):
         )
         if answered:
             self.set_score(player, new_score)
-        player.scores_by_question[-1] = new_score
+        player.score_by_question[-1] = new_score
 
     def close(self):
         self.song_player.stop()
