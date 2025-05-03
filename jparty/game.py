@@ -56,14 +56,14 @@ class QuestionTimer(object):
 
     def pause(self):
         self.__thread = None
-        self.__elapsed_time += time.time() - self.__start_time
+        self.__elapsed_time += time.perf_counter_ns() - self.__start_time
 
     def resume(self):
         self.__thread = threading.Thread(
             target=self.run, args=(self.interval - self.__elapsed_time,)
         )
         self.__thread.start()
-        self.__start_time = time.time()
+        self.__start_time = time.perf_counter_ns()
 
 
 @dataclass
@@ -188,7 +188,7 @@ class GameData:
 
 
 class Game(QObject):
-    buzz_trigger = pyqtSignal(int)
+    buzz_trigger = pyqtSignal(int, float)
     new_player_trigger = pyqtSignal()
     wager_trigger = pyqtSignal(int, int)
     toolate_trigger = pyqtSignal()
@@ -212,6 +212,8 @@ class Game(QObject):
         self.previous_answerer = None
         self.timer = None
         self.soliciting_player = False  # part of selecting who found a daily double
+        self.early_buzzers = set()  # Track players who buzz before OPEN_RESPONSES
+        self.open_responses_time = None  # Track when OPEN_RESPONSES was activated
 
         self.song_player = SongPlayer()
         self.__judgement_round = 0
@@ -279,11 +281,10 @@ class Game(QObject):
             self.keystroke_manager.addEvent(
                 f"BUZZED_{player_index}",
                 index_to_key[player_index],
-                self.buzz,
+                lambda i=player_index: self.buzz(i, time.perf_counter_ns()),
                 lambda x: x, #nonsense
                 active=True,
-                persistent=True,
-                func_args=player_index
+                persistent=True
             )
         self.wager_trigger.connect(self.wager)
         self.buzz_trigger.connect(self.buzz)
@@ -334,6 +335,8 @@ class Game(QObject):
     def open_responses(self):
         self.dc.borders.lights(True)
         self.accepting_responses = True
+        self.open_responses_time = time.perf_counter_ns()  # Record when responses are opened
+        logging.info(f"Responses opened at {self.open_responses_time}. Early buzzers: {self.early_buzzers}")
 
         if not self.timer:
             self.timer = QuestionTimer(QUESTIONTIME, self.stumped)
@@ -343,16 +346,40 @@ class Game(QObject):
     def close_responses(self):
         self.timer.pause()
         self.accepting_responses = False
+        self.early_buzzers.clear()  # Clear early buzzers for new question
         self.dc.borders.lights(True)
 
     def keyboard_buzz(self):
-        self.buzz(0)
+        """Is this ever used???"""
+        buzz_time = time.perf_counter_ns()
+        logging.info(f"Keyboard buzz at {buzz_time}")
+        self.buzz(0, buzz_time)
 
-
-    def buzz(self, i_player):
+    def buzz(self, i_player, buzz_time=None):
+        if buzz_time is None:
+            buzz_time = time.perf_counter_ns()
+            logging.warning("Buzz called without timestamp, using current time")
+            
         player = self.players[i_player]
-        if self.accepting_responses and player is not self.previous_answerer:
-            logging.info(f"buzz ({time.time():.6f} s)")
+        
+        # If not accepting responses yet, mark as early buzzer
+        if not self.accepting_responses:
+            self.early_buzzers.add(player)
+            self.dc.player_widget(player).buzz_hint()
+            return
+            
+        # If accepting responses, check if player is locked out
+        if player in self.early_buzzers:
+            # Check if 250ms lockout period has passed (convert to ns)
+            if buzz_time - self.open_responses_time < 250_000_000:
+                # self.dc.player_widget(player).buzz_hint()
+                return
+            else:
+                self.early_buzzers.remove(player)  # Remove from lockout after period
+            
+        # Only process buzz if player is not the previous answerer
+        if player is not self.previous_answerer:
+            logging.info(f"Valid buzz registered at {buzz_time}")
             self.accepting_responses = False
             self.timer.pause()
             self.previous_answerer = player
