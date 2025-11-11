@@ -12,8 +12,12 @@ parser.add_argument(
 args = parser.parse_args()
 
 for game_id in args.game_ids:
+    print(f"Working on {game_id}")
     game_html = get_game_html(game_id)
     game_obj = process_game_board_from_html(game_html, game_id)
+    if (SAVED_GAMES / f"{game_id}.html").exists():
+        print("Game already saved")
+        continue
     with (SAVED_GAMES / f"{game_id}.html").open("w+", encoding="utf-8") as f:
         f.write(game_html)
     time.sleep(5)

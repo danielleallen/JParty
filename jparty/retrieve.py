@@ -54,10 +54,13 @@ def get_Gsheet_game(file_id):
 def get_game_html(game_id):
     saved_game_path = SAVED_GAMES / f"{game_id}.html"
     if saved_game_path.exists():
-        print("game is saved, using saved game")
-        with saved_game_path.open("r") as f:
-            game_html = f.read()
-            return game_html
+        print("game is saved, try using saved game")
+        try:
+            with saved_game_path.open("r") as f:
+                game_html = f.read()
+                return game_html
+        except UnicodeDecodeError:
+            print("UnicodeDecodeError on saved game, trying from internet")
     try:
         print("using wayback machine")
         game_html = get_wayback_game_html(game_id)
@@ -145,7 +148,7 @@ def process_game_board_from_html(html, game_id) -> GameData:
     rounds = soup.find_all(class_="round")
     # Use only Double and Triple Jeopardy for Celebrity Jeopardy
     if len(rounds) == 3:
-        rounds = rounds[1:]
+        rounds = rounds[:2]
     for i, ro in enumerate(rounds):
         categories_objs = ro.find_all(class_="category")
         categories = [c.find(class_="category_name").text for c in categories_objs]

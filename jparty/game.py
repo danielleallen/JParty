@@ -582,8 +582,13 @@ class Game(QObject):
     def get_dd_wager(self, player):
         self.answering_player = player
         self.soliciting_player = False
+        try:
+            logging.info(f"Current round is: {self.current_round}")
+            logging.info(f"Rounds are {self.data.rounds}")
+            round_index = self.data.rounds.index(self.current_round)
+        except:
+            round_index = 1
 
-        round_index = self.data.rounds.index(self.current_round)
         max_wager = max(
             self.answering_player.score,
             1000 if round_index == 0 else 2000)
