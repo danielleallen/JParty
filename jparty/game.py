@@ -191,6 +191,7 @@ class Game(QObject):
     new_player_trigger = pyqtSignal()
     wager_trigger = pyqtSignal(int, int)
     toolate_trigger = pyqtSignal()
+    lectern_update_trigger = pyqtSignal(int, dict)
 
     def __init__(self):
         super().__init__()
@@ -288,6 +289,7 @@ class Game(QObject):
         self.buzz_trigger.connect(self.buzz)
         self.new_player_trigger.connect(self.new_player)
         self.toolate_trigger.connect(self.__toolate)
+        self.lectern_update_trigger.connect(self.__broadcast_lectern_update)
 
     def startable(self):
         return self.valid_game() and len(self.buzzer_controller.connected_players) > 0
@@ -320,6 +322,8 @@ class Game(QObject):
         self.players = self.buzzer_controller.connected_players
         self.dc.scoreboard.refresh_players()
         self.host_display.welcome_widget.check_start()
+        for player in self.players:
+            self._update_lectern_for_player(player)
 
     def remove_player(self, player):
         self.players.remove(player)
@@ -360,6 +364,7 @@ class Game(QObject):
             self.answering_player = player
             self.keystroke_manager.activate("CORRECT_ANSWER", "INCORRECT_ANSWER")
             self.dc.borders.lights(False)
+            self._update_lectern_for_player(player, buzzed=True)
         elif self.active_question is None:
             self.dc.player_widget(player).buzz_hint()
         else:
@@ -368,6 +373,8 @@ class Game(QObject):
     def answer_given(self):
         self.keystroke_manager.deactivate("CORRECT_ANSWER", "INCORRECT_ANSWER")
         self.dc.player_widget(self.answering_player).stop_lights()
+        if self.answering_player:
+            self._update_lectern_for_player(self.answering_player, buzzed=False)
         self.answering_player = None
 
     def update_original_player_scores(self):
@@ -585,6 +592,14 @@ class Game(QObject):
 
     def close_game(self):
         self.buzzer_controller.restart()
+        # Notify all lecterns that players are cleared
+        if self.buzzer_controller:
+            for player_number in list(self.buzzer_controller.lectern_connections.keys()):
+                if player_number in self.buzzer_controller.lectern_connections:
+                    try:
+                        self.buzzer_controller.lectern_connections[player_number].send("NO_PLAYER", "")
+                    except:
+                        pass
         self.players = []
         self.original_players = {}
         self.question_number = 1
@@ -685,9 +700,21 @@ class Game(QObject):
     def __toolate(self):
         self.buzzer_controller.toolate()
 
+    def __broadcast_lectern_update(self, player_number, state_dict):
+        if self.buzzer_controller:
+            self.buzzer_controller.broadcast_to_lecterns(player_number, state_dict)
+
+    def _update_lectern_for_player(self, player, buzzed=False):
+        if self.buzzer_controller:
+            state_dict = self.buzzer_controller.get_player_state_dict(player)
+            state_dict["buzzed"] = buzzed
+            state_dict["active"] = (self.answering_player is player) if self.answering_player else False
+            self.lectern_update_trigger.emit(player.player_number, state_dict)
+
     def set_score(self, player, score):
         player.score = score
         self.dc.player_widget(player).update_score()
+        self._update_lectern_for_player(player)
 
     def adjust_score(self, player):
         new_score, answered = QInputDialog.getInt(
