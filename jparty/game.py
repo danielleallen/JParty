@@ -15,7 +15,7 @@ matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 
 from jparty.utils import SongPlayer, resource_path, CompoundObject
-from jparty.constants import FJTIME, QUESTIONTIME, REPO_ROOT
+from jparty.constants import FJTIME, QUESTIONTIME, REPO_ROOT, EARLY_BUZZ_PENALTY
 
 
 MAX_PLAYERS = 6
@@ -211,6 +211,9 @@ class Game(QObject):
         self.previous_answerer = None
         self.timer = None
         self.soliciting_player = False  # part of selecting who found a daily double
+        
+        self.early_buzzes = set()
+        self.responses_open_time = None
 
         self.song_player = SongPlayer()
         self.__judgement_round = 0
@@ -331,6 +334,7 @@ class Game(QObject):
         return self.data is not None and all(b.complete() for b in self.data.rounds)
 
     def open_responses(self):
+        self.responses_open_time = time.time()
         self.dc.borders.lights(True)
         self.accepting_responses = True
 
@@ -351,6 +355,16 @@ class Game(QObject):
     def buzz(self, i_player):
         player = self.players[i_player]
         if self.accepting_responses and player is not self.previous_answerer:
+            # Check if player is in penalty period for early buzz
+            if i_player in self.early_buzzes and self.responses_open_time is not None:
+                elapsed = time.time() - self.responses_open_time
+                if elapsed < EARLY_BUZZ_PENALTY:
+                    logging.info(f"Early buzz penalty: player {i_player} ignored (elapsed: {elapsed:.3f}s)")
+                    return
+                else:
+                    # Penalty period expired, remove from early buzzes
+                    self.early_buzzes.discard(i_player)
+            
             logging.info(f"buzz ({time.time():.6f} s)")
             self.accepting_responses = False
             self.timer.pause()
@@ -363,7 +377,10 @@ class Game(QObject):
         elif self.active_question is None:
             self.dc.player_widget(player).buzz_hint()
         else:
-            pass
+            # Track early buzz (after load_question but before open_responses)
+            if self.active_question is not None and not self.accepting_responses:
+                self.early_buzzes.add(i_player)
+                logging.info(f"Early buzz recorded: player {i_player}")
 
     def answer_given(self):
         self.keystroke_manager.deactivate("CORRECT_ANSWER", "INCORRECT_ANSWER")
@@ -390,6 +407,8 @@ class Game(QObject):
         self.update_original_player_scores()
         self.active_question = None
         self.previous_answerer = None
+        self.early_buzzes = set()
+        self.responses_open_time = None
         if all(q.complete for q in self.current_round.questions):
             logging.info("NEXT ROUND")
             self.keystroke_manager.activate("NEXT_ROUND")
@@ -594,6 +613,8 @@ class Game(QObject):
         self.timer = None
         self.data = None
         self.__judgement_round = 0
+        self.early_buzzes = set()
+        self.responses_open_time = None
         self.dc.restart()
         self.begin()
 
