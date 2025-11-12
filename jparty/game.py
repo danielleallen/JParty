@@ -10,9 +10,12 @@ import sys
 import simpleaudio as sa
 from collections.abc import Iterable
 import logging
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
 
 from jparty.utils import SongPlayer, resource_path, CompoundObject
-from jparty.constants import FJTIME, QUESTIONTIME
+from jparty.constants import FJTIME, QUESTIONTIME, REPO_ROOT
 
 
 MAX_PLAYERS = 6
@@ -24,7 +27,6 @@ index_to_key = {
     4: Qt.Key.Key_T,
     5: Qt.Key.Key_Y,
 }
-
 
 class QuestionTimer(object):
     def __init__(self, interval, f, *args, **kwargs):
@@ -141,6 +143,7 @@ class Question:
     complete: bool = False
     image: bool = False
     image_url: str = None
+    actual_results: str = None
 
 
 class Board(object):
@@ -195,11 +198,12 @@ class Game(QObject):
         self.host_display = None
         self.main_display = None
         self.dc = None
-
+        self.question_number = 1
         self.data = None
 
         self.current_round = None
         self.players = []
+        self.original_players = {}
 
         self.active_question = None
         self.accepting_responses = False
@@ -236,6 +240,9 @@ class Game(QObject):
         )
         self.keystroke_manager.addEvent(
             "CLOSE_GAME", Qt.Key.Key_Space, self.close_game, self.spacehints
+        )
+        self.keystroke_manager.addEvent(
+            "GENERATE_GRAPHS", Qt.Key.Key_Space, self.generate_final_score_graphs, self.spacehints
         )
         self.keystroke_manager.addEvent(
             "FINAL_OPEN_RESPONSES",
@@ -311,7 +318,6 @@ class Game(QObject):
 
     def new_player(self):
         self.players = self.buzzer_controller.connected_players
-        print(self.players)
         self.dc.scoreboard.refresh_players()
         self.host_display.welcome_widget.check_start()
 
@@ -364,11 +370,24 @@ class Game(QObject):
         self.dc.player_widget(self.answering_player).stop_lights()
         self.answering_player = None
 
+    def update_original_player_scores(self):
+        buzzed_players = []
+        for player, score in self.active_question.actual_results:
+            if player not in self.original_players:
+                self.original_players[player] = [0 for _ in range(self.question_number)]
+            buzzed_players.append(player)
+            self.original_players[player].append(score + self.original_players[player][-1])
+        for player in self.original_players:
+            if player not in buzzed_players:
+                self.original_players[player].append(self.original_players[player][-1])
+
     def back_to_board(self):
         logging.info("back_to_board")
+        self.question_number += 1
         self.dc.hide_question()
         self.timer = None
         self.active_question.complete = True
+        self.update_original_player_scores()
         self.active_question = None
         self.previous_answerer = None
         if all(q.complete for q in self.current_round.questions):
@@ -393,6 +412,8 @@ class Game(QObject):
 
         if isinstance(self.current_round, FinalBoard):
             self.dc.load_final(self.current_round.question)
+            self.active_question = self.current_round.question
+            self.update_original_player_scores()
             self.start_final()
         else:
             self.dc.board_widget.load_round(self.current_round)
@@ -461,12 +482,16 @@ class Game(QObject):
 
     def final_correct_answer(self):
         ap = self.answering_player
+        new_score = ap.score + ap.wager
+        ap.update_scores(self.question_number, new_score)
         self.set_score(ap, ap.score + ap.wager)
         self.final_judgement_given()
 
     def final_incorrect_answer(self):
         ap = self.answering_player
-        self.set_score(ap, ap.score - ap.wager)
+        new_score = ap.score - ap.wager
+        ap.update_scores(self.question_number, new_score)
+        self.set_score(ap, new_score)
         self.final_judgement_given()
 
     def final_judgement_given(self):
@@ -495,12 +520,75 @@ class Game(QObject):
         else:
             self.dc.final_window.show_tie()
 
-        print("activate close game")
+        # self.generate_final_score_graph()
+        logging.info("Game over!")
+        self.keystroke_manager.activate("GENERATE_GRAPHS")
+
+    def generate_final_score_graphs(self):
+        self.keystroke_manager.deactivate("GENERATE_GRAPHS")
+        
+        for player_set in ["original", "current", "all"]:
+            self.generate_final_score_graph(player_set)
+        
+        # Ensure PyQt6 GUI is fully updated after all matplotlib operations
+        QApplication.processEvents()
+        
+        self.dc.load_final_graphs()
         self.keystroke_manager.activate("CLOSE_GAME")
+
+    def generate_final_score_graph(self, players):
+        """create an image of score by question number"""
+        current_player_data = {player.player_number : player.score_by_question for player in self.players}
+        if players == "original":
+            data = self.original_players
+        elif players == "current":
+            data = current_player_data
+        elif players == "all":
+            data = current_player_data | self.original_players
+        
+        game_id = os.environ["JPARTY_GAME_ID"]
+        
+        # Isolate matplotlib operations to prevent interference with PyQt6
+        fig = None
+        try:
+            # Create matplotlib figure
+            fig, ax = plt.subplots(figsize=(10, 6))
+            
+            # Plot each player's scores
+            for player, scores in data.items():
+                x_values = list(range(1, len(scores)+1))
+                ax.plot(x_values, scores, marker='o', label=str(player), linewidth=2, markersize=6)
+            
+            ax.set_xlabel('Question Number', fontsize=12)
+            ax.set_ylabel('Score', fontsize=12)
+            ax.set_title(f'Game {game_id}:Player Scores', fontsize=14, fontweight='bold')
+            ax.legend(loc='best')
+            ax.grid(True, alpha=0.3)
+            
+            # Save the figure
+            games_scores_dir = REPO_ROOT / "jparty" / "data" / "game_scores"
+            games_scores_dir.mkdir(exist_ok=True)
+            image_path = games_scores_dir / f"{game_id}-{players}.jpg"
+            
+            plt.tight_layout()
+            fig.savefig(str(image_path), dpi=150, bbox_inches='tight')
+        finally:
+            # Always clean up matplotlib state
+            if fig is not None:
+                plt.close(fig)  # Close figure to free memory
+            plt.close('all')  # Close all figures to ensure clean state
+            # Ensure matplotlib doesn't interfere with PyQt6
+            plt.ioff()  # Turn off interactive mode
+        
+        # Process PyQt6 events to ensure GUI stays responsive
+        QApplication.processEvents()
 
     def close_game(self):
         self.buzzer_controller.restart()
         self.players = []
+        self.original_players = {}
+        self.question_number = 1
+        self.active_question = None
         self.current_round = None
         self.answering_player = None
         self.timer = None
@@ -512,13 +600,21 @@ class Game(QObject):
     def get_dd_wager(self, player):
         self.answering_player = player
         self.soliciting_player = False
+        try:
+            logging.info(f"Current round is: {self.current_round}")
+            logging.info(f"Rounds are {self.data.rounds}")
+            round_index = self.data.rounds.index(self.current_round)
+        except:
+            round_index = 1
 
-        max_wager = max(self.answering_player.score, 1000)
+        max_wager = max(
+            self.answering_player.score,
+            1000 if round_index == 0 else 2000)
         wager_res = QInputDialog.getInt(
             self.host_display,
             "Wager",
-            f"How much do they wager? (max: ${max_wager})",
-            min=0,
+            f"How much do they wager? (min: 5, max: ${max_wager})",
+            min=5,
             max=max_wager,
         )
         if not wager_res[1]:
@@ -553,21 +649,25 @@ class Game(QObject):
         self.keystroke_manager.activate("FINAL_OPEN_RESPONSES")
 
     def correct_answer(self):
+        new_score = self.answering_player.score + self.active_question.value
+        self.answering_player.update_scores(self.question_number, new_score) 
         if self.timer:
             self.timer.cancel()
 
         self.set_score(
             self.answering_player,
-            self.answering_player.score + self.active_question.value,
+            new_score,
         )
         self.dc.borders.lights(False)
         self.answer_given()
         self.back_to_board()
 
     def incorrect_answer(self):
+        new_score = self.answering_player.score - self.active_question.value
+        self.answering_player.update_scores(self.question_number, new_score) 
         self.set_score(
             self.answering_player,
-            self.answering_player.score - self.active_question.value,
+            new_score,
         )
         self.answer_given()
         if self.active_question.dd:
@@ -598,6 +698,7 @@ class Game(QObject):
         )
         if answered:
             self.set_score(player, new_score)
+        player.score_by_question[-1] = new_score
 
     def close(self):
         self.song_player.stop()
@@ -608,15 +709,14 @@ class Player(object):
     def __init__(self, name, waiter, player_number):
         self.name = name
         self.token = os.urandom(15)
+        # score at index 0 is start of game, 1 after first question
+        self.score_by_question = [0]
         self.score = 0
         self.waiter = waiter
         self.wager = None
         self.finalanswer = ""
         self.page = "buzz"
         self.player_number = player_number
-
-
-
         self.key = index_to_key[player_number]
 
     def __hash__(self):
@@ -624,3 +724,13 @@ class Player(object):
 
     def state(self):
         return {"page": self.page, "score": self.score}
+    
+    def update_scores(self, question_number, new_score):
+        """update players score"""
+        if (len(self.score_by_question)) == question_number:
+            self.score_by_question.append(new_score)
+        else:
+            for _ in range(question_number - len(self.score_by_question)):
+                self.score_by_question.append(self.score_by_question[-1])
+            self.score_by_question.append(new_score)
+

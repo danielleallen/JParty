@@ -20,7 +20,7 @@ from jparty.question_widget import (
     HostFinalJeopardyWidget,
     HostImageQuestionWidget,
 )
-from jparty.final_display import FinalDisplay
+from jparty.final_display import FinalDisplay, GraphDisplay
 from jparty.welcome_widget import Welcome, QRWidget
 
 
@@ -57,6 +57,7 @@ class DisplayWindow(QMainWindow):
 
         self.final_window = None
         self.final_display = None
+        self.graph_display = None
 
         self.setCentralWidget(self.newWidget)
 
@@ -134,6 +135,12 @@ class DisplayWindow(QMainWindow):
         self.final_display = FinalDisplay(self.game, self)
         self.final_window = self.final_display.answer_widget
 
+    def load_final_graphs(self):
+        self.graph_display = GraphDisplay(self)
+        self.question_widget.setVisible(False)
+        self.final_display.setVisible(False)
+        self.board_layout.replaceWidget(self.question_widget, self.graph_display)
+
     def closeEvent(self, event):
         super().closeEvent(event)
         self.game.close()
@@ -149,9 +156,22 @@ class DisplayWindow(QMainWindow):
                 label.question = None
 
     def restart(self):
+        # If graph_display is in the layout, replace it with board_widget first
+        if self.graph_display is not None:
+            # Check if graph_display is actually in the layout
+            layout_item = self.board_layout.itemAt(1)  # Position 1 is where board_widget/graph_display/question_widget should be
+            if layout_item is not None and layout_item.widget() == self.graph_display:
+                self.graph_display.setVisible(False)
+                self.board_layout.replaceWidget(self.graph_display, self.board_widget)
+                self.board_widget.setVisible(True)
+        
         self.hide_question()
-        self.final_display.close()
+        if self.final_display is not None:
+            self.final_display.close()
+        if self.graph_display is not None:
+            self.graph_display.close()
         self.final_display = None
+        self.graph_display = None
         self.board_widget.clear()
         self.show_welcome_widgets()
         self.scoreboard.refresh_players()

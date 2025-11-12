@@ -6,6 +6,7 @@ import json
 from jparty.game import Question, Board, FinalBoard, GameData
 import logging
 import csv
+import os
 from jparty.constants import MONIES, SAVED_GAMES, QUESTION_MEDIA
 
 
@@ -53,10 +54,13 @@ def get_Gsheet_game(file_id):
 def get_game_html(game_id):
     saved_game_path = SAVED_GAMES / f"{game_id}.html"
     if saved_game_path.exists():
-        print("game is saved, using saved game")
-        with saved_game_path.open("r") as f:
-            game_html = f.read()
-            return game_html
+        print("game is saved, try using saved game")
+        try:
+            with saved_game_path.open("r") as f:
+                game_html = f.read()
+                return game_html
+        except UnicodeDecodeError:
+            print("UnicodeDecodeError on saved game, trying from internet")
     try:
         print("using wayback machine")
         game_html = get_wayback_game_html(game_id)
@@ -67,6 +71,7 @@ def get_game_html(game_id):
     return game_html
 
 def get_game(game_id):
+    os.environ["JPARTY_GAME_ID"] = str(game_id)
     if len(str(game_id)) < 7:
         game_html = get_game_html(game_id)
         return process_game_board_from_html(game_html, game_id)
@@ -98,6 +103,34 @@ def find_question_media(game_id: int, round: int, index: tuple) -> str:
                 return str(media_file)
     return False
 
+def get_actual_player_results(clue: BeautifulSoup, value: int):
+    """Get the results from the actual jeopardy contestants"""
+    dd_value = clue.find(class_="clue_value_daily_double")
+    if dd_value is not None:
+        value = int(dd_value.text[5:].replace(",", ""))
+    wrong_answers = clue.find_all("td", {"class": "wrong"})
+    answers = [
+        [wrong_answer.text, -value] 
+        for wrong_answer in wrong_answers 
+        if wrong_answer.text != "Triple Stumper"
+    ]
+    right_answer = clue.find("td", {"class": "right"})
+    if right_answer:
+        answers.append([right_answer.text, value])
+    return answers
+
+def get_actual_player_final(clue: BeautifulSoup) -> list[list[str]]:
+    answers = []
+    wrong_players = clue.find_all("td", {"class": "wrong"})
+    for player_answer in wrong_players:
+        value = int(player_answer.parent.find_next_sibling("tr").text.strip()[1:].replace(",", ""))
+        answers.append([player_answer.text, -value])
+    right_players = clue.find_all("td", {"class": "right"})
+    for player_answer in right_players:
+        value = int(player_answer.parent.find_next_sibling("tr").text.strip()[1:].replace(",", ""))
+        answers.append([player_answer.text, value])
+    return answers
+
 def process_game_board_from_html(html, game_id) -> GameData:
     """Given j-archive html, produce a game data object"""
     soup = BeautifulSoup(html, "html.parser")
@@ -115,33 +148,51 @@ def process_game_board_from_html(html, game_id) -> GameData:
     rounds = soup.find_all(class_="round")
     # Use only Double and Triple Jeopardy for Celebrity Jeopardy
     if len(rounds) == 3:
-        rounds = rounds[1:]
+        rounds = rounds[:2]
     for i, ro in enumerate(rounds):
         categories_objs = ro.find_all(class_="category")
         categories = [c.find(class_="category_name").text for c in categories_objs]
         questions = []
+        dds = 0
         for clue in ro.find_all(class_="clue"):
             text_obj = clue.find(class_="clue_text")
             if text_obj is None:
+                print(f"{game_id} is inccomplete")
                 logging.info("this game is incomplete")
                 return None
             image_likely = text_obj.find('a')
             image_url = None
             text = text_obj.text
+            # get actual player results
             index_key = text_obj["id"]
             index = (
                 int(index_key[-3]) - 1,
                 int(index_key[-1]) - 1,
             )  # get index from id string
             dd = clue.find(class_="clue_value_daily_double") is not None
+            if dd:
+                dds += 1
+            if dds > i + 1:
+                dd = False 
             value = MONIES[i][index[1]]
+            actual_results = get_actual_player_results(clue, value)
             answer = findanswer(clue)
             potential_media_file = find_question_media(game_id, i, index)
             if potential_media_file:
                 image_likely = True
                 image_url = potential_media_file
             questions.append(
-                Question(index, text, answer, categories[index[0]], value, dd, image=image_likely, image_url=image_url)
+                Question(
+                    index,
+                    text,
+                    answer,
+                    categories[index[0]],
+                    value,
+                    dd,
+                    image=image_likely,
+                    image_url=image_url,
+                    actual_results=actual_results
+                )
             )
         boards.append(Board(categories, questions, dj=(i == 1)))
 
@@ -150,14 +201,16 @@ def process_game_board_from_html(html, game_id) -> GameData:
     category_obj = final_round_obj.find_all(class_="category")[0]
     category = category_obj.find(class_="category_name").text
     clue = final_round_obj.find_all(class_="clue")[0]
+    actual_results = get_actual_player_final(clue)
     text_obj = clue.find(class_="clue_text")
     if text_obj is None:
         logging.info("this game is incomplete")
         return None
 
+
     text = text_obj.text
     answer = findanswer(final_round_obj)
-    question = Question((0, 0), text, answer, category)
+    question = Question((0, 0), text, answer, category, actual_results=actual_results)
 
     boards.append(FinalBoard(category, question))
 
