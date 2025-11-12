@@ -586,6 +586,9 @@ class Game(QObject):
     def close_game(self):
         self.buzzer_controller.restart()
         self.players = []
+        self.original_players = {}
+        self.question_number = 1
+        self.active_question = None
         self.current_round = None
         self.answering_player = None
         self.timer = None
