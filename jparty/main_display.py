@@ -156,9 +156,20 @@ class DisplayWindow(QMainWindow):
                 label.question = None
 
     def restart(self):
+        # If graph_display is in the layout, replace it with board_widget first
+        if self.graph_display is not None:
+            # Check if graph_display is actually in the layout
+            layout_item = self.board_layout.itemAt(1)  # Position 1 is where board_widget/graph_display/question_widget should be
+            if layout_item is not None and layout_item.widget() == self.graph_display:
+                self.graph_display.setVisible(False)
+                self.board_layout.replaceWidget(self.graph_display, self.board_widget)
+                self.board_widget.setVisible(True)
+        
         self.hide_question()
-        self.final_display.close()
-        self.graph_display.close()
+        if self.final_display is not None:
+            self.final_display.close()
+        if self.graph_display is not None:
+            self.graph_display.close()
         self.final_display = None
         self.graph_display = None
         self.board_widget.clear()

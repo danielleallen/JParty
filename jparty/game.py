@@ -10,7 +10,9 @@ import sys
 import simpleaudio as sa
 from collections.abc import Iterable
 import logging
-import plotly.graph_objects as go
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
 
 from jparty.utils import SongPlayer, resource_path, CompoundObject
 from jparty.constants import FJTIME, QUESTIONTIME, REPO_ROOT
@@ -25,9 +27,6 @@ index_to_key = {
     4: Qt.Key.Key_T,
     5: Qt.Key.Key_Y,
 }
-
-def save_image(figure, image_path):
-    figure.write_image(image_path)
 
 class QuestionTimer(object):
     def __init__(self, interval, f, *args, **kwargs):
@@ -527,8 +526,13 @@ class Game(QObject):
 
     def generate_final_score_graphs(self):
         self.keystroke_manager.deactivate("GENERATE_GRAPHS")
+        
         for player_set in ["original", "current", "all"]:
             self.generate_final_score_graph(player_set)
+        
+        # Ensure PyQt6 GUI is fully updated after all matplotlib operations
+        QApplication.processEvents()
+        
         self.dc.load_final_graphs()
         self.keystroke_manager.activate("CLOSE_GAME")
 
@@ -541,32 +545,43 @@ class Game(QObject):
             data = current_player_data
         elif players == "all":
             data = current_player_data | self.original_players
+        
         game_id = os.environ["JPARTY_GAME_ID"]
-        # Create traces for each player
-        traces = []
-        for player, scores in data.items():
-            trace = go.Scatter(x=list(range(1, len(scores)+1)),  # X-axis: Question Number
-                            y=scores,  # Y-axis: Score
-                            mode='lines+markers',
-                            name=player)
-            traces.append(trace)
-        # Create layout
-        layout = go.Layout(title=f'Game {game_id}:Player Scores',
-                        xaxis=dict(title='Question Number'),
-                        yaxis=dict(title='Score'),
-                        showlegend=True)
-
-        fig = go.Figure(data=traces, layout=layout)
-        games_scores_dir = REPO_ROOT / "jparty" / "data" / "game_scores"
-        games_scores_dir.mkdir(exist_ok=True)
-
-        # Run rendering in a separate thread
-        render_thread = threading.Thread(
-            target=save_image,
-            args=(fig, str(games_scores_dir / f"{game_id}-{players}.jpg")),
-        )
-        render_thread.start()
-        render_thread.join()
+        
+        # Isolate matplotlib operations to prevent interference with PyQt6
+        fig = None
+        try:
+            # Create matplotlib figure
+            fig, ax = plt.subplots(figsize=(10, 6))
+            
+            # Plot each player's scores
+            for player, scores in data.items():
+                x_values = list(range(1, len(scores)+1))
+                ax.plot(x_values, scores, marker='o', label=str(player), linewidth=2, markersize=6)
+            
+            ax.set_xlabel('Question Number', fontsize=12)
+            ax.set_ylabel('Score', fontsize=12)
+            ax.set_title(f'Game {game_id}:Player Scores', fontsize=14, fontweight='bold')
+            ax.legend(loc='best')
+            ax.grid(True, alpha=0.3)
+            
+            # Save the figure
+            games_scores_dir = REPO_ROOT / "jparty" / "data" / "game_scores"
+            games_scores_dir.mkdir(exist_ok=True)
+            image_path = games_scores_dir / f"{game_id}-{players}.jpg"
+            
+            plt.tight_layout()
+            fig.savefig(str(image_path), dpi=150, bbox_inches='tight')
+        finally:
+            # Always clean up matplotlib state
+            if fig is not None:
+                plt.close(fig)  # Close figure to free memory
+            plt.close('all')  # Close all figures to ensure clean state
+            # Ensure matplotlib doesn't interfere with PyQt6
+            plt.ioff()  # Turn off interactive mode
+        
+        # Process PyQt6 events to ensure GUI stays responsive
+        QApplication.processEvents()
 
     def close_game(self):
         self.buzzer_controller.restart()
