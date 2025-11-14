@@ -50,8 +50,11 @@ var updater = {
         // Update player name
         var nameElement = document.getElementById("player-name");
         var nameBox = document.getElementById("name-box");
+        var logoElement = document.getElementById("logo");
         if (state.name) {
             nameBox.classList.remove("no-player");
+            logoElement.style.display = "none";
+            nameElement.style.display = "block";
             if (state.name.substring(0, 21) === "data:image/png;base64") {
                 // It's a signature image
                 nameElement.innerHTML = '<img src="' + state.name + '" alt="Player Signature">';
@@ -61,6 +64,8 @@ var updater = {
         } else {
             nameBox.classList.add("no-player");
             nameElement.textContent = "";
+            nameElement.style.display = "none";
+            logoElement.style.display = "block";
         }
 
         // Update score
@@ -166,8 +171,11 @@ var updater = {
     showNoPlayer: function() {
         var nameElement = document.getElementById("player-name");
         var nameBox = document.getElementById("name-box");
+        var logoElement = document.getElementById("logo");
         nameBox.classList.add("no-player");
         nameElement.textContent = "";
+        nameElement.style.display = "none";
+        logoElement.style.display = "block";
         var scoreElement = document.getElementById("player-score");
         scoreElement.textContent = "$0";
         scoreElement.classList.remove("condensed");

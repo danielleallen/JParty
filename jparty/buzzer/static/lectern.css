@@ -120,3 +120,10 @@ body {
     max-height: 100%;
     object-fit: contain;
 }
+
+.logo {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    display: block;
+}
