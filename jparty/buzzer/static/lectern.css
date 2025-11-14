@@ -5,14 +5,11 @@
 }
 
 body {
-    background-color: #000000;
+    background-color: #1010a1;
     font-family: 'Anton', sans-serif;
     overflow: hidden;
     width: 100vw;
     height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
 }
 
 .lectern-container {
@@ -20,47 +17,48 @@ body {
     height: 100%;
     display: flex;
     flex-direction: column;
+}
+
+/* Lights container - absolute top, full width */
+.lights-container {
+    width: 100%;
+    display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 5%;
-    position: relative;
+    gap: 2px;
+    padding: 0;
+    flex-shrink: 0;
+    background-color: #000000;
+    border-bottom: 1px solid #000000;
 }
 
-.player-name-container {
+.light {
+    flex: 1;
+    min-width: 0;
+    aspect-ratio: 2.5 / 1;
+    background-color: #000000;
+    border: 1px solid #808080;
+    transition: background-color 0.2s ease;
+}
+
+.light.active {
+    background-color: #ff0000;
+}
+
+/* Score box - full width, black border, centered content */
+.score-box {
+    width: 100%;
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    max-width: 90%;
-}
-
-.player-name {
-    color: #ffffff;
-    font-size: 8vw;
-    text-align: center;
-    word-wrap: break-word;
-    line-height: 1.1;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.player-name img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-}
-
-.player-score-container {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
+    border: 2px solid #000000;
+    background-color: #1010a1;
+    padding: 20px;
 }
 
 .player-score {
     color: #ffffff;
-    font-size: 12vw;
+    font-size: 14vw;
     text-align: center;
     font-weight: bold;
     text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
@@ -70,34 +68,47 @@ body {
     color: #ff0000;
 }
 
-.status-indicator {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background-color: #333333;
+/* Answering box - full width, black border, blue/white background */
+.answering-box {
+    width: 100%;
+    flex: 1;
+    border: 2px solid #000000;
+    background-color: #1010a1;
     transition: background-color 0.3s ease;
 }
 
-.status-indicator.active {
-    background-color: #00ff00;
-    box-shadow: 0 0 20px #00ff00;
+.answering-box.active {
+    background-color: #ffffff;
 }
 
-.status-indicator.buzzed {
-    background-color: #ffff00;
-    box-shadow: 0 0 20px #ffff00;
-    animation: pulse 1s infinite;
+/* Name box - full width, black border, blue background or player name */
+.name-box {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #000000;
+    background-color: #1010a1;
+    padding: 20px;
 }
 
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.5;
-    }
+.name-box.no-player {
+    background-color: #1010a1;
 }
 
+.player-name {
+    color: #ffffff;
+    font-size: 7vw;
+    text-align: center;
+    word-wrap: break-word;
+    line-height: 1.1;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    width: 100%;
+}
+
+.player-name img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
