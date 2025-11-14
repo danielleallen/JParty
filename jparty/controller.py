@@ -23,6 +23,8 @@ class Application(tornado.web.Application):
             (r"/", WelcomeHandler),
             (r"/play", BuzzerHandler),
             (r"/buzzersocket", BuzzerSocketHandler),
+            (r"/lectern", LecternHandler),
+            (r"/lecternsocket", LecternSocketHandler),
         ]
         settings = dict(
             cookie_secret="",
@@ -140,6 +142,62 @@ class BuzzerSocketHandler(tornado.websocket.WebSocketHandler):
         pass
 
 
+class LecternHandler(tornado.web.RequestHandler):
+    def get(self):
+        player_number = self.get_argument("player", "0")
+        self.render("lectern.html", player_number=player_number)
+
+
+class LecternSocketHandler(tornado.websocket.WebSocketHandler):
+    def initialize(self):
+        self.controller = self.application.controller
+        self.player_number = None
+
+    def get_compression_options(self):
+        return {}
+
+    def open(self):
+        self.set_nodelay(True)
+        try:
+            # Get player number from query string
+            player_arg = self.get_argument("player", "0")
+            self.player_number = int(player_arg)
+            if self.player_number < 0 or self.player_number >= MAXPLAYERS:
+                raise ValueError(f"Player number {self.player_number} out of range")
+            logging.info(f"Lectern connected for player {self.player_number}")
+            self.controller.lectern_connections[self.player_number] = self
+            self.send_initial_state()
+        except (ValueError, TypeError) as e:
+            logging.error(f"Invalid player number for lectern: {e}")
+            self.close()
+
+    def send(self, msg, text=""):
+        data = {"message": msg, "text": text}
+        try:
+            self.write_message(data)
+            logging.info(f"Sent to lectern {self.player_number}: {data}")
+        except:
+            logging.error(f"Error sending message to lectern {self.player_number}: {msg}", exc_info=True)
+
+    def send_initial_state(self):
+        if self.player_number is not None and self.controller.game:
+            player = self.controller.get_player_by_number(self.player_number)
+            if player:
+                state = self.controller.get_player_state_dict(player)
+                self.send("PLAYER_STATE", tornado.escape.json_encode(state))
+            else:
+                self.send("NO_PLAYER", "")
+
+    def on_message(self, message):
+        pass
+
+    def on_close(self):
+        if self.player_number is not None:
+            if self.player_number in self.controller.lectern_connections:
+                del self.controller.lectern_connections[self.player_number]
+            logging.info(f"Lectern disconnected for player {self.player_number}")
+
+
 class BuzzerController:
     def __init__(self, game):
         self.thread = None
@@ -151,6 +209,7 @@ class BuzzerController:
         self.port = options.port
         self.connected_players = []
         self.accepting_players = True
+        self.lectern_connections = {}
 
     def start(self, threaded=True, tries=0):
         try:
@@ -233,3 +292,26 @@ class BuzzerController:
     def toolate(self):
         for p in self.connected_players:
             p.waiter.send("TOOLATE")
+
+    def get_player_by_number(self, player_number):
+        if self.game and player_number < len(self.game.players):
+            return self.game.players[player_number]
+        return None
+
+    def get_player_state_dict(self, player):
+        return {
+            "name": player.name,
+            "score": player.score,
+            "player_number": player.player_number,
+            "active": False,
+            "buzzed": False,
+            "finalanswer": getattr(player, 'finalanswer', None),
+        }
+
+    def broadcast_to_lecterns(self, player_number, state_dict):
+        if player_number in self.lectern_connections:
+            lectern = self.lectern_connections[player_number]
+            try:
+                lectern.send("PLAYER_STATE", tornado.escape.json_encode(state_dict))
+            except:
+                logging.error(f"Error broadcasting to lectern {player_number}", exc_info=True)
