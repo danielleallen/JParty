@@ -373,9 +373,10 @@ class Game(QObject):
     def answer_given(self):
         self.keystroke_manager.deactivate("CORRECT_ANSWER", "INCORRECT_ANSWER")
         self.dc.player_widget(self.answering_player).stop_lights()
-        if self.answering_player:
-            self._update_lectern_for_player(self.answering_player, buzzed=False)
+        answering_player = self.answering_player
         self.answering_player = None
+        if answering_player:
+            self._update_lectern_for_player(answering_player, buzzed=False)
 
     def update_original_player_scores(self):
         buzzed_players = []
@@ -397,6 +398,13 @@ class Game(QObject):
         self.update_original_player_scores()
         self.active_question = None
         self.previous_answerer = None
+        # Clear active state for all players on lecterns
+        if self.answering_player:
+            self._update_lectern_for_player(self.answering_player, buzzed=False)
+        self.answering_player = None
+        # Update all players to ensure lecterns show correct state
+        for player in self.players:
+            self._update_lectern_for_player(player, buzzed=False)
         if all(q.complete for q in self.current_round.questions):
             logging.info("NEXT ROUND")
             self.keystroke_manager.activate("NEXT_ROUND")
@@ -474,6 +482,9 @@ class Game(QObject):
 
         self.dc.final_window.guess_label.setText("")
         self.dc.final_window.wager_label.setText("")
+        
+        # Update lectern to show player name (answer will be shown in final_show_answer)
+        self._update_lectern_for_player(self.answering_player, show_final_answer=False)
 
         self.keystroke_manager.activate("FINAL_SHOW_ANSWER")
 
@@ -483,6 +494,8 @@ class Game(QObject):
             answer = "________"
 
         self.dc.final_window.guess_label.setText(answer)
+        # Update lectern to show final answer
+        self._update_lectern_for_player(self.answering_player, show_final_answer=True)
         self.keystroke_manager.activate(
             "FINAL_CORRECT_ANSWER", "FINAL_INCORRECT_ANSWER"
         )
@@ -704,11 +717,14 @@ class Game(QObject):
         if self.buzzer_controller:
             self.buzzer_controller.broadcast_to_lecterns(player_number, state_dict)
 
-    def _update_lectern_for_player(self, player, buzzed=False):
+    def _update_lectern_for_player(self, player, buzzed=False, show_final_answer=False):
         if self.buzzer_controller:
             state_dict = self.buzzer_controller.get_player_state_dict(player)
             state_dict["buzzed"] = buzzed
             state_dict["active"] = (self.answering_player is player) if self.answering_player else False
+            # Only include finalanswer if we're showing it
+            if not show_final_answer:
+                state_dict["finalanswer"] = None
             self.lectern_update_trigger.emit(player.player_number, state_dict)
 
     def set_score(self, player, score):

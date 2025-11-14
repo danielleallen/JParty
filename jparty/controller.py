@@ -305,6 +305,7 @@ class BuzzerController:
             "player_number": player.player_number,
             "active": False,
             "buzzed": False,
+            "finalanswer": getattr(player, 'finalanswer', None),
         }
 
     def broadcast_to_lecterns(self, player_number, state_dict):

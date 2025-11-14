@@ -47,11 +47,18 @@ var updater = {
     },
 
     updatePlayerState: function(state) {
-        // Update player name
+        // Update player name or final answer
         var nameElement = document.getElementById("player-name");
         var nameBox = document.getElementById("name-box");
         var logoElement = document.getElementById("logo");
-        if (state.name) {
+        
+        // Check if we should show final answer (takes priority over name)
+        if (state.finalanswer !== undefined && state.finalanswer !== null && state.finalanswer !== "") {
+            nameBox.classList.remove("no-player");
+            logoElement.style.display = "none";
+            nameElement.style.display = "block";
+            nameElement.textContent = state.finalanswer;
+        } else if (state.name) {
             nameBox.classList.remove("no-player");
             logoElement.style.display = "none";
             nameElement.style.display = "block";
