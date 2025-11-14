@@ -47,7 +47,8 @@ body {
 /* Score box - full width, black border, centered content */
 .score-box {
     width: 100%;
-    flex: 1;
+    flex: 0 0 auto;
+    height: 30vh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -58,10 +59,16 @@ body {
 
 .player-score {
     color: #ffffff;
-    font-size: 14vw;
+    font-family: "Helvetica Neue", "Helvetica", "Arial Narrow", "Arial", sans-serif;
+    font-size: 25vw;
     text-align: center;
     font-weight: bold;
     text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+    letter-spacing: -0.02em;
+}
+
+.player-score.condensed {
+    font-stretch: extra-condensed;
 }
 
 .player-score.negative {
@@ -69,9 +76,10 @@ body {
 }
 
 /* Answering box - full width, black border, blue/white background */
+/* Height set by JavaScript to position border at 13.5/28.1 of screen */
 .answering-box {
     width: 100%;
-    flex: 1;
+    flex: 0 0 auto;
     border: 2px solid #000000;
     background-color: #1010a1;
     transition: background-color 0.3s ease;

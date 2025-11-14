@@ -74,6 +74,15 @@ var updater = {
         } else {
             scoreElement.classList.remove("negative");
         }
+        
+        // Apply extra-condensed font if score has 6 digits
+        var absScore = Math.abs(score);
+        var digitCount = absScore.toString().length;
+        if (digitCount >= 6) {
+            scoreElement.classList.add("condensed");
+        } else {
+            scoreElement.classList.remove("condensed");
+        }
 
         // Update answering box
         var answeringBox = document.getElementById("answering-box");
@@ -107,11 +116,12 @@ var updater = {
 
         // Light pattern: center (5), then center 3 (4-6), then center 5 (3-7), then center 7 (2-8), then all 9
         var lightPatterns = [
-            [5],           // Stage 1: center light
-            [4, 5, 6],     // Stage 2: center 3
-            [3, 4, 5, 6, 7], // Stage 3: center 5
+            [1, 2, 3, 4, 5, 6, 7, 8, 9], // Stage 5: all 9
             [2, 3, 4, 5, 6, 7, 8], // Stage 4: center 7
-            [1, 2, 3, 4, 5, 6, 7, 8, 9] // Stage 5: all 9
+            [3, 4, 5, 6, 7], // Stage 3: center 5
+            [4, 5, 6],     // Stage 2: center 3
+            [5],           // Stage 1: center light
+            [],            // Stage 0: no lights
         ];
 
         // Start animation sequence
@@ -158,7 +168,10 @@ var updater = {
         var nameBox = document.getElementById("name-box");
         nameBox.classList.add("no-player");
         nameElement.textContent = "";
-        document.getElementById("player-score").textContent = "$0";
+        var scoreElement = document.getElementById("player-score");
+        scoreElement.textContent = "$0";
+        scoreElement.classList.remove("condensed");
+        scoreElement.classList.remove("negative");
         document.getElementById("answering-box").classList.remove("active");
         this.stopLights();
     },
@@ -177,8 +190,49 @@ var updater = {
     }
 };
 
+function positionAnsweringBox() {
+    var lightsContainer = document.getElementById('lights-container');
+    var scoreBox = document.getElementById('score-box');
+    var answeringBox = document.getElementById('answering-box');
+    var nameBox = document.getElementById('name-box');
+    
+    if (!lightsContainer || !scoreBox || !answeringBox || !nameBox) {
+        return;
+    }
+    
+    // Target position: 13.5/28.1 of screen height (this is where the border should be)
+    var targetBorderPosition = (13.5 / 28.1) * window.innerHeight;
+    
+    // Get actual heights after layout
+    var lightsHeight = lightsContainer.offsetHeight;
+    var scoreHeight = scoreBox.offsetHeight;
+    
+    // Calculate answering box height so that lights + score + answering = target position
+    var answeringBoxHeight = targetBorderPosition - lightsHeight - scoreHeight;
+    
+    // Ensure minimum height
+    if (answeringBoxHeight > 50) {
+        answeringBox.style.height = answeringBoxHeight + 'px';
+    } else {
+        answeringBox.style.height = '50px';
+    }
+    
+    // Verify the border is at the right position (for debugging)
+    var actualBorderPosition = lightsHeight + scoreHeight + answeringBox.offsetHeight;
+    console.log('Target border position: ' + targetBorderPosition + 'px, Actual: ' + actualBorderPosition + 'px');
+}
+
 $(document).ready(function() {
     updater.start();
+    
+    // Position answering box initially and on resize
+    setTimeout(function() {
+        positionAnsweringBox();
+    }, 100);
+    
+    window.addEventListener('resize', function() {
+        setTimeout(positionAnsweringBox, 50);
+    });
     
     // Handle page visibility changes to reconnect if needed
     document.addEventListener("visibilitychange", function() {
@@ -186,6 +240,7 @@ $(document).ready(function() {
             console.log("Page visible, checking connection...");
             updater.start();
         }
+        setTimeout(positionAnsweringBox, 100);
     });
 });
 
