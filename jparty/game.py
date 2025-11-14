@@ -320,6 +320,7 @@ class Game(QObject):
 
     def new_player(self):
         self.players = self.buzzer_controller.connected_players
+        self._update_player_numbers()
         self.dc.scoreboard.refresh_players()
         self.host_display.welcome_widget.check_start()
         for player in self.players:
@@ -328,8 +329,35 @@ class Game(QObject):
     def remove_player(self, player):
         self.players.remove(player)
         player.waiter.close()
+        self._update_player_numbers()
         self.dc.scoreboard.refresh_players()
         self.host_display.welcome_widget.check_start()
+        for player in self.players:
+            self._update_lectern_for_player(player)
+
+    def move_player_up(self, player):
+        if player not in self.players:
+            return
+        index = self.players.index(player)
+        if index > 0:
+            self.players[index], self.players[index - 1] = self.players[index - 1], self.players[index]
+            self._update_player_numbers()
+            self.dc.scoreboard.refresh_players()
+
+    def move_player_down(self, player):
+        if player not in self.players:
+            return
+        index = self.players.index(player)
+        if index < len(self.players) - 1:
+            self.players[index], self.players[index + 1] = self.players[index + 1], self.players[index]
+            self._update_player_numbers()
+            self.dc.scoreboard.refresh_players()
+
+    def _update_player_numbers(self):
+        """Update player_number and key for all players based on their position in the list."""
+        for i, player in enumerate(self.players):
+            player.player_number = i
+            player.key = index_to_key[i]
 
     def valid_game(self):
         return self.data is not None and all(b.complete() for b in self.data.rounds)

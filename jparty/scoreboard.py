@@ -167,12 +167,24 @@ class PlayerWidget(QWidget):
 class HostPlayerWidget(PlayerWidget):
     def __init__(self, game, player, parent=None):
         self.remove_button = None
+        self.up_button = None
+        self.down_button = None
         super().__init__(game, player, parent)
         self.remove_button = QPushButton("", self)
         # self.remove_button.setStyleSheet("color: red")
         self.remove_button.clicked.connect(partial(self.game.remove_player, player))
         self.remove_button.setIcon(QIcon(resource_path("close-icon.png")))
         self.remove_button.show()
+
+        self.up_button = QPushButton("▲", self)
+        self.up_button.clicked.connect(partial(self.game.move_player_up, player))
+        self.up_button.setStyleSheet("QPushButton { font-size: 16px; font-weight: bold; }")
+        self.up_button.show()
+
+        self.down_button = QPushButton("▼", self)
+        self.down_button.clicked.connect(partial(self.game.move_player_down, player))
+        self.down_button.setStyleSheet("QPushButton { font-size: 16px; font-weight: bold; }")
+        self.down_button.show()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -181,6 +193,16 @@ class HostPlayerWidget(PlayerWidget):
             xbutton_size = int(self.width() * 0.2)
             self.remove_button.resize(QSize(xbutton_size, xbutton_size))
             self.remove_button.setIconSize(self.size())
+        
+        if self.up_button is not None:
+            button_size = int(self.width() * 0.15)
+            self.up_button.move(QPoint(self.width() - button_size, 0))
+            self.up_button.resize(QSize(button_size, button_size))
+        
+        if self.down_button is not None:
+            button_size = int(self.width() * 0.15)
+            self.down_button.move(QPoint(self.width() - button_size, self.height() - button_size))
+            self.down_button.resize(QSize(button_size, button_size))
 
 
 class ScoreBoard(QWidget):
@@ -200,6 +222,7 @@ class ScoreBoard(QWidget):
         return 0.2 * self.width()
 
     def refresh_players(self):
+        # Remove widgets for players no longer in the game
         for pw in list(self.player_widgets):  # copy list so we can remove elements
             if pw.player not in self.game.players:
                 i = self.player_layout.indexOf(pw)
@@ -208,12 +231,32 @@ class ScoreBoard(QWidget):
                 self.player_widgets.remove(pw)
                 pw.deleteLater()
 
+        # Create a mapping of player to widget
+        player_to_widget = {pw.player: pw for pw in self.player_widgets}
+
+        # Rebuild layout in correct order
+        # Clear all widgets and stretches except the initial stretch
+        while self.player_layout.count() > 1:
+            item = self.player_layout.takeAt(1)
+            if item.widget():
+                item.widget().setParent(None)
+        
+        # Reorder player_widgets list and rebuild layout
+        self.player_widgets = []
         for (i, p) in enumerate(self.game.players):
-            if not any(pw.player is p for pw in self.player_widgets):
+            if p in player_to_widget:
+                pw = player_to_widget[p]
+            else:
                 pw = self.create_player_widget(p)
-                self.player_layout.insertWidget(2 * i + 1, pw)
-                self.player_layout.insertStretch(2 * i + 2)
-                self.player_widgets.append(pw)
+            self.player_widgets.append(pw)
+            self.player_layout.insertWidget(2 * i + 1, pw)
+            self.player_layout.insertStretch(2 * i + 2)
+            
+            # Enable/disable reorder buttons based on position
+            if hasattr(pw, 'up_button'):
+                pw.up_button.setEnabled(i > 0)
+            if hasattr(pw, 'down_button'):
+                pw.down_button.setEnabled(i < len(self.game.players) - 1)
 
         self.update()
 
@@ -235,3 +278,9 @@ class HostScoreBoard(ScoreBoard):
         for pw in self.player_widgets:
             pw.remove_button.setVisible(False)
             pw.remove_button.setEnabled(False)
+            if hasattr(pw, 'up_button'):
+                pw.up_button.setVisible(False)
+                pw.up_button.setEnabled(False)
+            if hasattr(pw, 'down_button'):
+                pw.down_button.setVisible(False)
+                pw.down_button.setEnabled(False)
