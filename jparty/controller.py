@@ -8,6 +8,7 @@ from tornado.options import define, options
 import os
 from threading import Thread
 import socket
+import time
 
 from jparty.environ import root
 from jparty.game import Player
@@ -77,7 +78,6 @@ class BuzzerSocketHandler(tornado.websocket.WebSocketHandler):
             logging.error(f"Error sending message {msg}", exc_info=True)
 
     def check_if_exists(self, token):
-
         p = self.controller.player_with_token(token)
         if p is None:
             logging.info("NEW")
@@ -92,7 +92,8 @@ class BuzzerSocketHandler(tornado.websocket.WebSocketHandler):
     def on_message(self, message):
         # do this first to kill latency
         if "BUZZ" in message:
-            self.buzz()
+            buzz_time = time.perf_counter_ns()
+            self.buzz(buzz_time)
             return
         parsed = tornado.escape.json_decode(message)
         msg = parsed["message"]
@@ -106,12 +107,10 @@ class BuzzerSocketHandler(tornado.websocket.WebSocketHandler):
             self.wager(text)
         elif msg == "ANSWER":
             self.application.controller.answer(self.player, text)
-
         else:
             raise Exception("Unknown message")
 
     def init_player(self, name):
-
         if not self.controller.accepting_players:
             logging.info("Game started!")
             self.send("GAMESTARTED")
@@ -128,8 +127,8 @@ class BuzzerSocketHandler(tornado.websocket.WebSocketHandler):
         )
         self.send("TOKEN", self.player.token.hex())
 
-    def buzz(self):
-        self.application.controller.buzz(self.player)
+    def buzz(self, buzz_time):
+        self.application.controller.buzz(self.player, buzz_time)
 
     def wager(self, text):
         self.application.controller.wager(self.player, int(text))
@@ -234,10 +233,14 @@ class BuzzerController:
         self.connected_players = []
         self.accepting_players = True
 
-    def buzz(self, player):
+    def buzz(self, player, buzz_time=None):
+        if buzz_time is None:
+            buzz_time = time.perf_counter_ns()
+            logging.warning("Buzz called without timestamp in controller, using current time")
+            
         if self.game:
             i_player = self.game.players.index(player)
-            self.game.buzz_trigger.emit(i_player)
+            self.game.buzz_trigger.emit(i_player, buzz_time)
         else:
             i_player = self.connected_players.index(player)
             self.game.buzz_hint_trigger.emit(i_player)
